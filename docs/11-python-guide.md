@@ -59,6 +59,8 @@ with Device() as dev:                  # finds and connects to the pedal by itse
 ```
 
 `bindings/python/examples/monitor.py` is the full version (`--listen`, `--port`, `--replay`, `--all`).
+`bindings/python/examples/shell.py` is an interactive shell over the whole API: inspect presets and state, send
+live edits, back up, and save presets/settings (with confirmation). `-c CMD` runs commands non-interactively.
 
 ## The device engine
 

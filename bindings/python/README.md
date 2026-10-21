@@ -49,6 +49,7 @@ maturin develop                          # build and install in place (re-run af
 pytest                                   # tests driven by ../../captures/logs
 python -m mypy.stubtest open_stomp --ignore-missing-stub   # stubs match the compiled module
 python examples/monitor.py --replay ../../captures/logs/01-main-session.log --speed 8
+python examples/shell.py                 # interactive shell: inspect, edit, save, back up (`help` lists commands)
 ```
 
 License: MIT OR Apache-2.0.
