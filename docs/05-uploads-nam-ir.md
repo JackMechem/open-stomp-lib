@@ -112,19 +112,56 @@ What the buffers show (FNDR and Jcm800):
 | `NamFirG1`, `NamFirG2` → upload | 2 × 1024 × `f32` | **`g1 = reverse(G1IR[0:1024])`, `g2 = reverse(G2IR[0:1024])`**: the upload is the first 1024 taps of each response, time-reversed. That is the "smoothly rising" first half seen in the captures |
 | `factor` | `f32` | 1.0 for both files; written into the slot-info record (offset 52) |
 
-Working model: the app identifies a **Wiener–Hammerstein** approximation of the network, *G1 → static nonlinearity →
-G2*, by playing sine tones through the NAM model and measuring each tone's fundamental and 3rd harmonic. It then
-designs G1 and G2 as minimum-phase FIRs and the pedal runs them around its own fixed nonlinearity. What remains:
+### The algorithm (`NamFileThread::run`)
 
-1. How a tone is generated and measured (amplitude, length, window; `getSpectrum`, `ampCapture_run_data`,
-   `levelsTesterItem`).
-2. How `g1GainsDb` is derived from the levels (and what the 95th value is), and how G2 is derived.
-3. The magnitude → minimum-phase design (`Magnitude2MinPhase`, `hilbert2`, `FIRExecObj_compile`) and the
-   interpolation between tone bins.
-4. When `factor` is not 1.0.
+Recovered from the disassembly (Ghidra) and **verified stage by stage**: given the model's input/output for each call
+(captured by the harness with `--log-io`), the open-stomp-manager `tools/namconv/reference.py` reproduces every
+vendor buffer for both test files (tone levels to ≤ 1e-5, `g1GainsDb` to ≤ 0.011 dB, G1IR/G2IR/upload to ≤ 7e-5
+relative; the rest is float32 vs float64 FFT rounding). The model is a **Wiener–Hammerstein** approximation:
+*G1 → the pedal's own static nonlinearity → G2*, with G1·G2 = the network's small-signal response.
 
-The NAM network itself must be run to measure the tones, so the final converter needs NAM inference (port
-NeuralAmpModelerCore, MIT, or bind it).
+Building blocks:
+
+* **Spectrum**: an 8192-point FFT (TI DSPLIB `DSPF_sp_fftSPxSP`, no window, no scaling) of real input; bins
+  0…4095, as power `re² + im²` or magnitude.
+* **DC blocker** on every model output: biquad `b = [0.9953827, −1.990765, 0.9953827]`,
+  `a = [1, −1.990744, 0.9907867]`, float32. Its state is reset to zero once, before the BLA run, and then **carries
+  over** from call to call (BLA, then each tone in order). The NAM model's own state carries over the same way.
+* All model calls run at 48 kHz on one channel, in this order: the BLA run (8192 samples), then 94 tones
+  (10240 samples each).
+
+Steps:
+
+1. **Best linear approximation.** `y = model(BLA_x)`, DC-blocked. `BLA_x` is an 8192-sample constant in the binary:
+   a pink random-phase multisine over every bin, amplitude `√(1/max(f, 40 Hz))` scaled by 1e-5 (peak ≈ 3e-5, about
+   −90 dBFS), so the model is driven in its small-signal range. Its phases don't come from `rand()`; it was
+   apparently generated offline. `H[k] = |Y[k]| / |X[k]|` for k = 0…4095, and `H_dB = 20·log10 H`.
+2. **Smoothing** (1/24 octave): for k = 2…4095, `lo = max(floor(k / 2^(1/48)), 2)`,
+   `hi = clamp(ceil(k · 2^(1/48)), lo, 4095)` (`fcvtms` / `fcvtps`), `m = max(k, lo)`. Weights are triangular in
+   log-frequency: `w_j = (log j − log(lo−1)) / (log m − log(lo−1))` for j ≤ m, `(log(hi+1) − log j) / (log(hi+1) − log m)`
+   for j > m. `Hs[k] = sqrt(Σ w_j H_j² / Σ w_j)`, and `Hs[0] = Hs[1] = Hs[2]`.
+3. **Tone test.** For each of the 94 bins b in `ToneTest_FftBins` (58.6 Hz … 14.6 kHz, ~1/12 octave): input
+   `sinf(n · b · 2π/8192)` for n = 0…10239 (amplitude 1.0), model, DC blocker, power spectrum of samples
+   2048…10239. `level = √P[b] · (π/4) / 4096`; for the first 83 tones also `level3 = √P[3b] · (3π/4) / 4096`
+   (the 3rd harmonic).
+4. **Gains.** `F[k]` = levels linearly interpolated between tone bins (held at the first/last value outside),
+   `T[k]` = 3rd-harmonic levels interpolated over the `3b` bins (0 below, last value above), `M = max(F, T)`.
+   **`g1GainsDb[i] = 20·log10(Hs[b_i] / M[b_i])`.**
+5. **Curves.** `G1_dB[k]` = `g1GainsDb` interpolated **in log-frequency** between tone bins (held outside).
+   `G2_dB[k] = H_dB[k] − G1_dB[k]` (unsmoothed H).
+6. **Filters.** Each curve → linear magnitude, mirrored to 8192 points as `m[8191−k] = m[k]` (note: not `m[N−k]`),
+   then `Magnitude2MinPhase`: `φ = −imag(hilbert(ln m))` (`ln 0 → −30`), `IR = real(ifft(m · e^{jφ}))` (1/N-scaled).
+   This gives `G1IR` and `G2IR`.
+7. **Upload.** `g1 = reverse(G1IR[0:1024])`, `g2 = reverse(G2IR[0:1024])`, **`factor` = 1.0 (a constant in the
+   code)**.
+
+The rest of `run()` (FIR objects, "match EQ" buffers, the `srand(33)` odd-prime multisine `levelsTesterItem`) sets
+up other features and does not affect the upload.
+
+To build an open converter we need: NAM inference (WaveNet / SlimmableContainer, as used by the bundled
+NeuralAmpModelerCore: port it or bind it), and our own BLA excitation with the same spectrum. Ours can't be
+byte-identical to the vendor's since `BLA_x` can't be regenerated, but at −90 dBFS the BLA is insensitive to the
+phases. That claim is still to be measured with the harness.
 
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
