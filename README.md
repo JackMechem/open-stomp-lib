@@ -1,7 +1,7 @@
 # open-stomp
 
 A Rust library for the SORAN Dual Stomp Lite guitar pedal ·
-Version **0.1.0** · Linux · macOS · Windows · [changelog](CHANGELOG.md)
+Version **0.2.0** · Linux · macOS · Windows · [changelog](CHANGELOG.md)
 
 `open-stomp` talks to the **SORAN Dual Stomp Lite** guitar multi-effects pedal (USB `3962:2000`, "JME STOMPBOX")
 over USB-MIDI. It implements the protocol reverse engineered from the vendor's *Stomp Manager* app, and this repo
@@ -31,7 +31,7 @@ The protocol layer has no I/O and no dependencies. The device layer uses [`midir
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.1.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.2.0" }
 ```
 
 ```rust
@@ -55,6 +55,22 @@ while let Ok(update) = dev.recv() {
 dev.select_preset(4);                    // P05
 dev.set_head(Module::Amp, 8, true);      // AMP on, model 8 (Mar J800)
 dev.set_param(Module::Amp, 0, 100);      // GAIN 100
+```
+
+From **Python** (same library, compiled in with PyO3; see the [Python guide](docs/11-python-guide.md)):
+
+```sh
+pip install ./bindings/python
+```
+
+```python
+from open_stomp import Device, DeviceState
+
+state = DeviceState()
+with Device() as dev:
+    for u in dev:
+        if ev := state.feed(u):
+            print(ev)                    # AMP      Mar J800 · GAIN = 64
 ```
 
 Without the pedal:
@@ -127,6 +143,7 @@ building, architecture) are in [open-stomp-manager](https://github.com/JackMeche
 | [08 Static analysis](docs/08-static-analysis.md) | App binary (Flutter/Dart AOT), native libs, firmware notes |
 | [09 Open questions](docs/09-open-questions.md) | What's left and how to find out |
 | [10 Library guide](docs/10-library-guide.md) | **Using this crate**: engine, state, editing, saving, recipes, testing |
+| [11 Python guide](docs/11-python-guide.md) | **Using it from Python**: the same API through `import open_stomp` |
 
 ## Development
 
@@ -136,6 +153,7 @@ cargo test --no-default-features   # protocol layer only
 cargo clippy --all-targets -- -D warnings
 cargo doc --open
 nix develop                        # optional dev shell: cargo, rust-analyzer, ALSA, amidi
+cd bindings/python && maturin develop && pytest   # Python bindings (pip install maturin pytest)
 ```
 
 Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers (`libasound2-dev` / `alsa-lib-devel`). CI runs on
@@ -157,6 +175,7 @@ To release:
 
 ```
 src/              the library (see docs/10 for the module map)
+bindings/python/  Python bindings (PyO3 + maturin): Rust glue, typed package, tests, examples
 examples/         monitor (live / replay), decode (capture → text), ports (list MIDI ports)
 tests/            capture-driven integration tests (fake pedal, engine replay)
 captures/logs/    capture logs of the official app and the pedal: the test vectors

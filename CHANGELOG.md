@@ -6,6 +6,17 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-21
+
+### Added
+- **Python bindings** (`bindings/python`, `pip install ./bindings/python`, `import open_stomp`):
+  the whole library through PyO3, mirroring the crate's modules: protocol, catalogue, records,
+  `DeviceState`, `RequestQueue`, capture reader and the `Device` engine. One `abi3` wheel per
+  platform for Python ≥ 3.9, typed stubs checked with `stubtest`, GIL released while waiting,
+  Ctrl-C interrupts blocking calls. `DeviceState.feed(update)` applies engine updates. Tests
+  driven by the capture logs, a `monitor.py` example and a Python guide (docs/11).
+- The repository is now a Cargo workspace; the crate and the Python package share its version.
+
 ## [0.1.0] - 2026-10-21
 
 First release as a standalone library. The protocol code comes from the `stomp-proto` crate of
@@ -31,5 +42,6 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JackMechem/open-stomp-lib/releases/tag/v0.1.0

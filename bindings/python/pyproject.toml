@@ -1,0 +1,32 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "open-stomp"
+description = "Talk to the SORAN Dual Stomp guitar pedal over USB-MIDI: protocol, state tracking and a connection engine (Rust, via PyO3)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT OR Apache-2.0"
+keywords = ["midi", "guitar", "pedal", "sysex", "soran"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Multimedia :: Sound/Audio :: MIDI",
+    "Typing :: Typed",
+]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/JackMechem/open-stomp-lib"
+Documentation = "https://github.com/JackMechem/open-stomp-lib/blob/main/docs/11-python-guide.md"
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.maturin]
+python-source = "python"
+module-name = "open_stomp._native"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

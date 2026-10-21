@@ -1,0 +1,18 @@
+[package]
+name = "open-stomp-python"
+description = "Python bindings for the open-stomp library (SORAN Dual Stomp guitar pedal)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+open-stomp = { path = "../.." }
+# one wheel per platform for every CPython >= 3.9 (stable ABI)
+pyo3 = { version = "0.30", features = ["abi3-py39"] }

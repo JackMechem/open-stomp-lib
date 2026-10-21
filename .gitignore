@@ -2,3 +2,10 @@
 target/
 result
 result-*
+__pycache__/
+*.so
+*.pyd
+.venv/
+.pytest_cache/
+.mypy_cache/
+dist/
