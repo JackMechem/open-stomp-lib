@@ -1,7 +1,8 @@
 name: Release
 
 # Push a tag `vX.Y.Z` matching Cargo.toml to test it and publish a GitHub release with the
-# CHANGELOG.md section as notes. Dependents pin the tag (git dependency or sibling checkout).
+# CHANGELOG.md section as notes and the Python wheels attached. Dependents pin the tag (git
+# dependency or sibling checkout).
 on:
   push:
     tags: ["v*"]
@@ -31,3 +32,56 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           body_path: notes.md
+
+  wheels:
+    name: wheels (${{ matrix.name }})
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64
+          - name: macos-universal
+            os: macos-latest
+            target: universal2-apple-darwin
+          - name: windows-x86_64
+            os: windows-latest
+            target: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: bindings/python
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          manylinux: "2_28"
+          # midir links ALSA on Linux
+          before-script-linux: dnf install -y alsa-lib-devel
+      - name: Smoke test
+        shell: bash
+        run: |
+          pip install bindings/python/dist/*.whl
+          python -c "import open_stomp; print(open_stomp.__version__, open_stomp.Module.AMP.models[8])"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: bindings/python/dist/*.whl
+
+  sdist:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: bindings/python
+          command: sdist
+          args: --out dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: bindings/python/dist/*.tar.gz

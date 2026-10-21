@@ -5,7 +5,7 @@ code: it parses and builds every message, keeps a model of the pedal up to date 
 requests the way the pedal needs, and (with the `device` feature) runs the MIDI connection for you.
 
 [Open Stomp Manager](https://github.com/JackMechem/open-stomp-manager) is built on it. Anything the GUI does with
-the pedal, your program can do with the calls below.
+the pedal, your program can do with the calls below. From Python, see [11](11-python-guide.md).
 
 * [Adding it to a project](#adding-it-to-a-project)
 * [Layers and modules](#layers-and-modules)
@@ -26,7 +26,7 @@ the pedal, your program can do with the calls below.
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.1.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.2.0" }
 # or, with a local checkout next to your project:
 open-stomp = { path = "../open-stomp-lib" }
 # protocol only (no MIDI I/O, no dependencies):

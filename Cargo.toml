@@ -1,11 +1,25 @@
-[package]
-name = "open-stomp"
-description = "Library for the SORAN Dual Stomp guitar pedal: USB-MIDI protocol encode/decode, state tracking and a device connection engine"
-version = "0.1.0"
+[workspace]
+resolver = "3"
+members = [".", "bindings/python"]
+# the Python extension is built with maturin (bindings/python/pyproject.toml), not plain cargo
+default-members = ["."]
+
+[workspace.package]
+# one version for the crate and the Python package
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/JackMechem/open-stomp-lib"
+
+[package]
+name = "open-stomp"
+description = "Library for the SORAN Dual Stomp guitar pedal: USB-MIDI protocol encode/decode, state tracking and a device connection engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
 readme = "README.md"
 keywords = ["midi", "guitar", "pedal", "sysex", "soran"]
 categories = ["multimedia::audio", "hardware-support", "parser-implementations"]

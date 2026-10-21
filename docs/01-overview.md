@@ -72,3 +72,4 @@ App UI layout (for reference when building a clone):
 | [08-static-analysis.md](08-static-analysis.md) | Static analysis of the app binary, firmware and native libs |
 | [09-open-questions.md](09-open-questions.md) | What is still unknown and how to find out |
 | [10-library-guide.md](10-library-guide.md) | The `open-stomp` crate: API guide, engine, recipes, testing without a pedal |
+| [11-python-guide.md](11-python-guide.md) | The Python bindings (`import open_stomp`) |

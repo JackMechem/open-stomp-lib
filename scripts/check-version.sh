@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Cargo.toml is the single source of truth for the version. Check that the README and CHANGELOG
+# Cargo.toml ([workspace.package]) is the single source of truth for the version of the crate and
+# the Python package. Check that the README and CHANGELOG
 # mention it, and (with an argument, e.g. from a release tag) that it matches.
 #
 #   scripts/check-version.sh            consistency check
@@ -17,6 +18,7 @@ grep -q "Version \*\*$v\*\*" README.md || fail "README.md does not say 'Version 
 grep -q "^## \[$v\]" CHANGELOG.md || fail "CHANGELOG.md has no '## [$v]' section"
 grep -q "tag = \"v$v\"" README.md || fail "README.md install snippet does not pin tag v$v"
 awk '/name = "open-stomp"/{getline; print}' Cargo.lock | grep -q "\"$v\"" || fail "Cargo.lock is stale (run cargo build)"
+awk '/name = "open-stomp-python"/{getline; print}' Cargo.lock | grep -q "\"$v\"" || fail "Cargo.lock is stale for the Python bindings"
 
 ((ok)) && echo "version $v is consistent"
 ((ok))
