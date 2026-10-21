@@ -188,6 +188,11 @@ Accuracy against the official app (the two test files; 1/3-octave magnitude resp
 | The app's `BLA_x` (`convert_with`; dump it from your own install with the harness) | ≤ 0.01 dB | ≤ 0.03 dB |
 | Ours (`excitation()`, the default) | 0.7–1.6 dB rms (max 2–7) | 1.0–1.3 dB rms (max 2–4) |
 
+**On hardware** (Dual Stomp Lite, V1.1.1): "Ampeg SVT – MD 421" (a `SlimmableContainer` bass model) converted by the
+official converter (run headless) and by ours, both uploaded with `Device::import_user_amp`, sound identical; on paper
+they differ by ≤ 0.15 dB (1/3-octave). The Jcm800 and FNDR models differ more on paper (below), because their DC offset
+is larger.
+
 The difference with our excitation is the app's own measurement noise: where the DC transient and the signal
 interfere (roughly 100 Hz – 1 kHz), the result depends on the excitation's phases, so the app itself would give a
 different answer by this much with any other table. Averaging over phases (computable in closed form) was tried and
