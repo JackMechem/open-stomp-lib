@@ -209,20 +209,47 @@ pub fn excitation() -> Vec<f32> {
     spec.iter().map(|c| (c.re / N as f64 * 1e-5) as f32).collect()
 }
 
-/// Convert a model with our excitation (see [`excitation`]).
+/// How the small-signal response `H` is measured.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Measure {
+    /// Exactly as the official app: one 8192-sample run from the model's reset state, DC blocker
+    /// starting from zero. Below ~100 Hz the blocker's start-up transient dominates (docs/05), so
+    /// the low bass of the result follows that transient rather than the model.
+    #[default]
+    App,
+    /// The excitation played twice and measured on the second, steady-state period: no transient,
+    /// the model's actual small-signal response at every frequency. Departs from the app on purpose.
+    Clean,
+}
+
+/// Convert a model with our excitation (see [`excitation`]), the app's way.
 pub fn convert(model: &mut Model) -> Converted {
     convert_with(model, &excitation())
 }
 
-/// Convert a model with a given 8192-sample BLA excitation. Resets the model first.
+/// Convert a model with a given 8192-sample BLA excitation, the app's way. Resets the model first.
 ///
 /// With the official app's own excitation (its `BLA_x` table, which can be dumped from an installed
 /// copy with the open-stomp-manager `tools/namconv/harness`), the result matches the app's upload
 /// to within float rounding (≤ 0.03 dB in 1/3-octave response).
 pub fn convert_with(model: &mut Model, bla_x: &[f32]) -> Converted {
+    convert_measured(model, bla_x, Measure::App)
+}
+
+/// Convert with a given excitation and measurement mode. Resets the model first.
+pub fn convert_measured(model: &mut Model, bla_x: &[f32], measure: Measure) -> Converted {
     assert_eq!(bla_x.len(), N, "the excitation is {N} samples");
-    model.reset();
     let fft = Fft::new();
+    let clean_h = (measure == Measure::Clean).then(|| {
+        model.reset();
+        let x2 = [bla_x, bla_x].concat();
+        let mut y2 = vec![0.0f32; 2 * N];
+        model.process(&x2, &mut y2);
+        DcBlocker::default().run(&mut y2);
+        let (py, px) = (fft.power(&y2[N..]), fft.power(bla_x));
+        py.iter().zip(&px).map(|(a, b)| a.sqrt() / b.sqrt()).collect::<Vec<f64>>()
+    });
+    model.reset();
     let mut dc = DcBlocker::default();
 
     // 1. best linear approximation (the run also sets the model and DC blocker state the tone
@@ -230,8 +257,13 @@ pub fn convert_with(model: &mut Model, bla_x: &[f32]) -> Converted {
     let mut y = vec![0.0f32; N];
     model.process(bla_x, &mut y);
     dc.run(&mut y);
-    let (py, px) = (fft.power(&y), fft.power(bla_x));
-    let h: Vec<f64> = py.iter().zip(&px).map(|(a, b)| a.sqrt() / b.sqrt()).collect();
+    let h: Vec<f64> = match clean_h {
+        Some(h) => h,
+        None => {
+            let (py, px) = (fft.power(&y), fft.power(bla_x));
+            py.iter().zip(&px).map(|(a, b)| a.sqrt() / b.sqrt()).collect()
+        }
+    };
     let h_db: Vec<f64> = h.iter().map(|v| 20.0 * v.log10()).collect();
     let hs = smooth(&h);
 

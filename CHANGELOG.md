@@ -16,6 +16,11 @@ All notable changes to `open-stomp`. The format follows
   noise. `Device::import_nam_file(slot, path)` converts and uploads. Examples `nam_convert`,
   `nam_render`, `nam_check`. Python: `open_stomp.nam`, `Device.import_nam_file`. Confirmed on
   hardware: an official and an open conversion of the same bass model sound identical.
+- `nam::convert::Measure::Clean` (`convert_measured`; Python `nam.convert(..., measure="clean")`),
+  experimental: the same converter with a steady-state small-signal measurement instead of the
+  app's transient-affected one. Re-amp tests on hardware against the real model (Ampeg SVT bass
+  model): closer mid scoop, top-end roll-off and upper-note distortion than the official
+  algorithm, but still short on the 63–90 Hz resonance and about 5 dB quieter. Not the default.
 - `upload` module: user AMP (NAM, SysEx `0x58`) and user IR (`0x10` + `0x09`) upload framing:
   chunking, the 128-byte slot-info record (`UserAmpInfo`: name, factor), delete, and a
   `Reassembler` that turns captured chunks back into floats. Every captured import rebuilds

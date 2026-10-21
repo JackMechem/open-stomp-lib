@@ -2,7 +2,7 @@
 
 import os
 from collections.abc import Sequence
-from typing import Optional, Union, final
+from typing import Literal, Optional, Union, final
 
 TONE_BINS: list[int]
 FFT_SIZE: int
@@ -43,6 +43,8 @@ class Converted:
     def g2_ir(self) -> list[float]: ...
 
 def convert(
-    model: Union[Model, str, os.PathLike[str]], excitation: Optional[Sequence[float]] = None
+    model: Union[Model, str, os.PathLike[str]],
+    excitation: Optional[Sequence[float]] = None,
+    measure: Literal["app", "clean"] = "app",
 ) -> Converted: ...
 def excitation() -> list[float]: ...
