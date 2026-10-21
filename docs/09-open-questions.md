@@ -4,10 +4,11 @@ Ordered by usefulness for a Linux editor. Each item says how to resolve it.
 
 ## High value
 
-1. **NAM → device conversion** (`imagelib`). 2048 floats = probably two 1024-float arrays (g1 transfer curve /
-   g2 reversed IR) + a "factor" scalar in the slot-info record. Resolve by reversing
-   `imagelib.framework` (`ImageUtility::loadNamFile`/`namModel`/`namBuffer`), validated against
-   `captures/files/*.device_floats.bin`. See [05](05-uploads-nam-ir.md).
+1. **NAM → device conversion** (`imagelib`). Partly solved: the 2048 floats are two time-reversed 1024-tap
+   minimum-phase FIRs (G1, G2) fitted from a sine tone test (fundamental + 3rd harmonic) through the NAM model, plus
+   `factor` (1.0) in the slot-info record; the vendor converter now runs headless as a reference
+   (open-stomp-manager `tools/namconv/`). Still open: tone generation/measurement, how the G1/G2 magnitudes are
+   derived, the min-phase design. See [05](05-uploads-nam-ir.md#the-converter-run-headless-2026-10).
 2. **IR transform.** Capture an upload of a short plain cab IR (< 2048 samples) and compare sample by sample. Also
    record which file was used for the existing capture (the two Tone Charm WAVs are candidates).
 3. **IR slot 4-byte field** (`0x09` record bytes 0–3): a CRC or a flag? It was `01 00 00 00` after an upload.

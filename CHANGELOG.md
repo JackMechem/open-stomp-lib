@@ -18,6 +18,9 @@ All notable changes to `open-stomp`. The format follows
 ### Changed
 - docs/05: corrected chunk header (plain byte offset + total length, not 8-byte units), the
   slot-info record layout, and the app selecting the slot's model *before* uploading.
+- docs/05, docs/09: NAM converter findings from running the vendor converter headless: the
+  upload is two time-reversed 1024-tap min-phase FIRs fitted from a fundamental + 3rd-harmonic
+  tone test (byte-identical to the captured uploads).
 
 ## [0.2.0] - 2026-10-21
 

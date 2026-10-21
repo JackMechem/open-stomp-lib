@@ -90,8 +90,41 @@ Test vectors (not in git; see `.gitignore`. Regenerate from the logs):
 | `FNDR BFSR VB Edge WRM2 CAB FREE.nam` | `NAM import 'FNDR` | `captures/files/FNDR.device_floats.bin` |
 | `Jcm800.nam` (from "Marshall Jcm800 + V30 1960.zip") | `deleted USER AMP NAM` (the next import after it) | `captures/files/Jcm800.device_floats.bin` |
 
-To finish this: disassemble `imagelib.framework` (`ImageUtility::loadNamFile`, `namModel`, `namBuffer`), most likely
-by probing the model with an impulse/sweep and fitting. Then validate against the vectors above.
+### The converter, run headless (2026-10)
+
+The app's converter can be run outside the app: `tools/namconv/` in the
+[open-stomp-manager](https://github.com/JackMechem/open-stomp-manager) repo (`nam-re` branch) loads
+`imagelib.framework` from the installed app, calls `ImageUtility::loadNamFile` by address (the C++ API isn't exported,
+but the symbol table names everything and `__TEXT` starts at 0), waits for the end callback and dumps every buffer.
+No pedal is involved. For both test files the harness output is **byte-identical** to the captured upload, so it is
+a reliable reference implementation, intermediate buffers included.
+
+What the buffers show (FNDR and Jcm800):
+
+| Buffer | Size | Finding |
+|---|---|---|
+| `ToneTest_FftBins` (const) | 94 × `int32` | Tone frequencies as bins of an **8192-point FFT at 48 kHz**: 10…2488 = 58.6 Hz…14.6 kHz, ~1/12-octave steps |
+| `ToneTest_FftBinsThird` (const) | 83 × `int32` | Exactly **3 × the fundamental bins**: the 3rd harmonic of each tone (up to 3951 < 4096) |
+| `ToneTestOutputLevels` | 94 × `f32` | Level of each tone's fundamental at the model's output |
+| `ToneTestOutputLevelsThird` | 83 × `f32` | Level of each tone's 3rd harmonic |
+| `g1GainsDb` | 94 (+1) × `f32` | Target gain per tone for G1, in dB. Roughly *constant − fundamental level*: G1 may be close to the inverse of the measured response (to check) |
+| `G1IR`, `G2IR` | 8192 × `f32` | Two impulse responses. `|FFT₈₁₉₂(G1IR)|` at the tone bins equals `g1GainsDb` (mean error 0.01–0.13 dB); both peak at sample 1–6 (minimum-phase-like; `Magnitude2MinPhase` and `hilbert2` exist) |
+| `NamFirG1`, `NamFirG2` → upload | 2 × 1024 × `f32` | **`g1 = reverse(G1IR[0:1024])`, `g2 = reverse(G2IR[0:1024])`**: the upload is the first 1024 taps of each response, time-reversed. That is the "smoothly rising" first half seen in the captures |
+| `factor` | `f32` | 1.0 for both files; written into the slot-info record (offset 52) |
+
+Working model: the app identifies a **Wiener–Hammerstein** approximation of the network, *G1 → static nonlinearity →
+G2*, by playing sine tones through the NAM model and measuring each tone's fundamental and 3rd harmonic. It then
+designs G1 and G2 as minimum-phase FIRs and the pedal runs them around its own fixed nonlinearity. What remains:
+
+1. How a tone is generated and measured (amplitude, length, window; `getSpectrum`, `ampCapture_run_data`,
+   `levelsTesterItem`).
+2. How `g1GainsDb` is derived from the levels (and what the 95th value is), and how G2 is derived.
+3. The magnitude → minimum-phase design (`Magnitude2MinPhase`, `hilbert2`, `FIRExecObj_compile`) and the
+   interpolation between tone bins.
+4. When `factor` is not 1.0.
+
+The NAM network itself must be run to measure the tones, so the final converter needs NAM inference (port
+NeuralAmpModelerCore, MIT, or bind it).
 
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
