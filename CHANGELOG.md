@@ -14,7 +14,8 @@ All notable changes to `open-stomp`. The format follows
   `DeviceState`, `RequestQueue`, capture reader and the `Device` engine. One `abi3` wheel per
   platform for Python ≥ 3.9, typed stubs checked with `stubtest`, GIL released while waiting,
   Ctrl-C interrupts blocking calls. `DeviceState.feed(update)` applies engine updates. Tests
-  driven by the capture logs, a `monitor.py` example and a Python guide (docs/11).
+  driven by the capture logs, `monitor.py` and `shell.py` (interactive) examples and a Python
+  guide (docs/11).
 - The repository is now a Cargo workspace; the crate and the Python package share its version.
 
 ## [0.1.0] - 2026-10-21
