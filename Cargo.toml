@@ -1,0 +1,39 @@
+[package]
+name = "open-stomp"
+description = "Library for the SORAN Dual Stomp guitar pedal: USB-MIDI protocol encode/decode, state tracking and a device connection engine"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/JackMechem/open-stomp-lib"
+readme = "README.md"
+keywords = ["midi", "guitar", "pedal", "sysex", "soran"]
+categories = ["multimedia::audio", "hardware-support", "parser-implementations"]
+include = ["src/", "examples/", "tests/", "docs/", "captures/logs/", "README.md", "CHANGELOG.md"]
+
+[lib]
+name = "open_stomp"
+
+[features]
+default = ["device"]
+# MIDI I/O: port discovery, auto-connect, handshake, request pacing, capture replay (midir).
+# Without it the crate is pure encode/decode with no dependencies.
+device = ["dep:midir", "dep:core-foundation-sys"]
+
+[dependencies]
+midir = { version = "0.11", optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# pump the engine thread's run loop so CoreMIDI can deliver device add/remove notifications
+core-foundation-sys = { version = "0.8", optional = true }
+
+[[example]]
+name = "monitor"
+required-features = ["device"]
+
+[[example]]
+name = "ports"
+required-features = ["device"]
+
+[package.metadata.docs.rs]
+all-features = true
