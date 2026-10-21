@@ -9,6 +9,7 @@ mod midi;
 mod queue;
 mod records;
 mod state;
+mod upload;
 mod util;
 
 use pyo3::prelude::*;
@@ -42,6 +43,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "state", state::register)?;
     submodule(m, "queue", queue::register)?;
     submodule(m, "capture", queue::register_capture)?;
+    submodule(m, "upload", upload::register)?;
     submodule(m, "device", device::register)?;
     Ok(())
 }

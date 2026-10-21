@@ -6,6 +6,19 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Added
+- `upload` module: user AMP (NAM, SysEx `0x58`) and user IR (`0x10` + `0x09`) upload framing:
+  chunking, the 128-byte slot-info record (`UserAmpInfo`: name, factor), delete, and a
+  `Reassembler` that turns captured chunks back into floats. Every captured import rebuilds
+  byte for byte. `Device::import_user_amp` / `delete_user_amp` / `import_user_ir` send the
+  official app's sequences (2048 finite floats, slots 0–9, else `UploadError`). Also in the
+  Python bindings (`open_stomp.upload`, `Device.import_user_amp` …).
+- `DeviceState` follows user AMP imports and deletes (slot names, log events with progress).
+
+### Changed
+- docs/05: corrected chunk header (plain byte offset + total length, not 8-byte units), the
+  slot-info record layout, and the app selecting the slot's model *before* uploading.
+
 ## [0.2.0] - 2026-10-21
 
 ### Added

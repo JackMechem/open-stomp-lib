@@ -1,23 +1,27 @@
 # 05 — User AMP (NAM) and User IR uploads
 
-Status: **transport fully decoded; content conversion NOT yet reversed.** You can replay a captured upload, but
-generating the payload from a `.nam` / `.wav` file still requires reversing the app's converter (open problem #1).
+Status: **transport fully decoded and implemented** (`open_stomp::upload`, rebuilt byte for byte from every captured
+import); **content conversion NOT yet reversed.** You can upload any 2048 floats (e.g. a captured conversion) to any
+slot, but generating them from a `.nam` / `.wav` file still requires reversing the app's converter (open problem #1).
 
 ## Common chunk format
 
-Both uploads send a series of SysEx writes, each acknowledged before the next. The body after `<dir>` is one
-**packed** stream ([03](03-sysex-protocol.md#2-packed-8-in-7-bitstream-packed)):
+Both uploads send a series of SysEx writes, each acknowledged (`dir` 3, echoing the header) before the next. The
+body after `<dir>` is one **packed** stream ([03](03-sysex-protocol.md#2-packed-8-in-7-bitstream-packed)):
 
 ```
-unpacked chunk = 12-byte header | float32 little-endian samples …
+unpacked = 12-byte header | data …
+
+header:  [0] 0   [1] slot   [2] sub-command   [3] 0   [4..8] byte offset (u32 LE)   [8..12] total length (u32 LE)
 ```
 
-* Data starts at **bit 96** of the packed stream (unpacked byte 12).
-* Raw chunk length 178 MIDI bytes → 136 data bytes = **34 float32** per chunk; the last chunk is shorter.
-* A chunk offset field sits in the header (MIDI bytes 5–6 hold `0, 0x11, 0x22 …` = offsets 0, 17, 34 … in 8-byte
-  units, i.e. 136 bytes per step).
-* **Every upload so far is exactly 2048 float32 = 8192 bytes**, in 61 chunks (60 × 34 + 8 floats).
+* Data chunks carry **136 bytes = 34 float32** (little-endian); the last one is shorter. Offsets are plain byte
+  offsets: 0, 136, 272 … 8160.
+* **Every upload so far is exactly 2048 float32 = 8192 bytes** (`total` = 8192), in 61 chunks (60 × 136 + 32 bytes).
+* The same header carries the slot-info record (`total` = 128) and header-only requests (read info, delete).
 * The real transfer takes only ~100 ms. The long wait in the app is the conversion.
+* Implemented as `open_stomp::upload` (`Chunk`, `data_frames`, `Reassembler`, `UserAmpInfo`, `user_amp_upload`,
+  `user_ir_upload`) and `Device::import_user_amp` / `delete_user_amp` / `import_user_ir`.
 
 [`tools/decode/nam_extract.py`](https://github.com/JackMechem/open-stomp-manager/blob/main/tools/decode/nam_extract.py) (in the open-stomp-manager repo) extracts the floats from a capture log:
 
@@ -32,20 +36,35 @@ Unpacked header byte 1 = slot (0–9 → USER AMP 01–10, amp models 30–39); 
 | Sub (unpacked) | MIDI byte 2 | Meaning |
 |---|---|---|
 | 1 | `04` | data chunk |
-| 3 | `0C` | write slot info (name etc.) |
-| 4 | `10` | read slot info |
+| 3 | `0C` | write slot info (128-byte record) |
+| 4 | `10` | read slot info (reply: the 128-byte record) |
 | 6 | `18` | delete slot |
 
 Captured import (Fender Super Reverb NAM → USER AMP 01):
 
 ```
-→ 70 58 01 00 00 0C …  (168 B)   write slot info      ← 70 58 03 00 00 0C … ack
-→ 70 58 01 00 00 04 00 00 00 00 … (178 B)  data chunk 0   ← ack (echoes header)
-→ … 61 data chunks total, offsets 0,17,34…1020 …
-→ B1 01 1E                        select amp model 30 (USER AMP 01)
+→ B1 01 1E                        select amp model 30 (USER AMP 01), before the upload
+→ 70 58 01 <info, total 128>      write slot info      ← 70 58 03 <header> ack
+→ 70 58 01 <data, offset 0>       data chunk 0         ← ack (echoes header)
+→ … 61 data chunks total, offsets 0, 136 … 8160 …
 ```
 
-Delete: `→ 70 58 01 00 00 18 00…` `← 70 58 03 03`, then the app re-reads the slot info.
+The app does not re-read the slot after an import. Delete: `→ 70 58 01 00 00 18 00…` `← 70 58 03 <1 byte>`, then the
+app re-reads the slot info, which comes back as an empty slot.
+
+### Slot-info record (128 bytes)
+
+| Bytes | Meaning |
+|---|---|
+| 0–31 | Name, ASCII, zero-padded (the app sends the file name without `.nam`, up to 31 characters) |
+| 32–35 | `u32` = 256 in every record seen (empty or imported) |
+| 36–51 | 0 |
+| 52–55 | `f32` **factor**: 1.0 in both captured imports (FNDR, Jcm800). Probably the `factor` of the converter callback |
+| 56–95 | 0 after an import; an empty slot reads back with `1.0` in each of the ten floats 56–95 too |
+| 96–127 | 0 |
+
+An empty slot reads back as name `"USER AMP NN"`, the `u32` 256 and eleven `1.0`s at 52–95. Both imports and the
+re-import were byte-identical apart from the name.
 
 ### What the 2048 floats are
 
@@ -78,12 +97,14 @@ by probing the model with an impulse/sweep and fitting. Then validate against th
 
 ```
 → B1 3B 02, B1 02 1E            app selects CAB page + USER IR 01 (model 30)
-→ 70 10 01 00 00 00 00 00 LL HH 00 00 00 00 01 00 <data…>   ×61, each ← 70 10 03 <header> ack
-→ 70 09 01 <slot> <packed: 01 00 00 00 "Delay And Reverb"…>   ← (CC 0x7E 00) + 70 09 03 00…
+→ 70 10 01 <data, sub 0, offset, total 8192>   ×61, each ← 70 10 03 <header> ack
+→ 70 09 01 <slot> <packed: 01 00 00 00, 32-byte name "Delay And Reverb">   ← (CC 0x7E 00) + 70 09 03 00…
 ```
 
-Data header: the same layout as NAM, with sub-command 0 (MIDI byte 2 = `00`). The slot number is presumably inside the
-header (only slot 0 was captured).
+Data header: the same layout as NAM, with sub-command 0. Only slot 0 was captured; the slot is assumed to sit in header
+byte 1 as for NAM. The `0x09` record is a 4-byte field (`01 00 00 00` after an upload, meaning unknown) and a 32-byte
+name. Note: in the capture this upload sits *just before* the `IR import 'delay and reverb'` marker (the "just
+before" markers were typed after the action).
 
 ### What the 2048 floats are
 

@@ -334,6 +334,30 @@ impl Device {
         self.with(|d| d.save_preset(source_slot, &preset.0))
     }
 
+    /// Import converted NAM data (2048 floats) into user AMP `slot` (0–9) like the official app:
+    /// select the slot's amp model, write the slot-info record, then the data. Raises
+    /// `ValueError` for a bad slot or data.
+    #[pyo3(signature = (slot, name, data, factor = 1.0))]
+    fn import_user_amp(&self, slot: u8, name: &str, data: Vec<f32>, factor: f32) -> PyResult<()> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.import_user_amp(slot, name, &data, factor).map_err(crate::upload::err)
+    }
+
+    /// Delete user AMP `slot` and re-read its info.
+    fn delete_user_amp(&self, slot: u8) -> PyResult<()> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.delete_user_amp(slot).map_err(crate::upload::err)
+    }
+
+    /// Import IR data (2048 floats) into user IR `slot` (0–9) like the official app.
+    fn import_user_ir(&self, slot: u8, name: &str, data: Vec<f32>) -> PyResult<()> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.import_user_ir(slot, name, &data).map_err(crate::upload::err)
+    }
+
     /// Write the global settings (start from `DeviceState.settings` so unknown bytes survive).
     fn write_settings(&self, settings: PyRef<'_, Settings>) -> PyResult<()> {
         self.with(|d| d.write_settings(&settings.0))

@@ -43,6 +43,7 @@ The package mirrors the Rust crate. The most used types are also importable from
 | `open_stomp.state` | `DeviceState`, `Event`, `Origin`, `Looper`, `Drum`, `Tuner`, `looper_state_name` | `state` |
 | `open_stomp.queue` | `RequestQueue`, `Request`, `Done`, `handshake`, `follow_up` | `queue` |
 | `open_stomp.capture` | `parse`, `Entry` | `capture` |
+| `open_stomp.upload` | `Chunk`, `Reassembler`, `UserAmpInfo`, `user_amp_upload`, `user_amp_delete`, `user_ir_upload`, `user_ir_name`, `data_frames`, `check`, `floats_to_bytes`, `bytes_to_floats` | `upload` |
 | `open_stomp.device` | `Device`, `Update` | `device` |
 
 ## Quick start
@@ -167,6 +168,18 @@ p.index = 21                       # store to P22 (or keep `source` to overwrite
 p.name = "Lead"                    # <= 16 printable ASCII; others become '?'
 dev.save_preset(source, p)         # name, record, then select the saved slot
 ```
+
+### Uploading a user AMP or IR
+
+```python
+dev.import_user_amp(2, "Jcm800", floats)      # 2048 floats -> USER AMP 03 (factor=1.0 by default)
+dev.import_user_ir(0, "My Cab", floats)       # USER IR 01
+dev.delete_user_amp(2)
+```
+
+Converting `.nam`/`.wav` files into the 2048 floats isn't implemented yet ([05](05-uploads-nam-ir.md)); a captured
+conversion can be recovered with `upload.Chunk.parse` + `upload.Reassembler` and uploaded to any slot. A bad slot or
+data raises `ValueError`.
 
 ### Changing system settings
 

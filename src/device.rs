@@ -24,9 +24,10 @@ use midir::{Ignore, MidiInput, MidiInputConnection, MidiOutput, MidiOutputConnec
 
 use crate::capture::{self, Entry};
 use crate::catalog::Module;
-use crate::midi::{Msg, hex, host};
+use crate::midi::{Msg, hex, host, req};
 use crate::queue::{RequestQueue, follow_up, handshake};
 use crate::records::{Preset, Settings};
+use crate::upload::{self, UploadError, UserAmpInfo};
 use crate::{Assembler, Origin, is_stomp_port};
 
 /// Engine settings.
@@ -231,6 +232,40 @@ impl Device {
     /// app's sequence. `source_slot` is the active preset the edits were made on.
     pub fn save_preset(&self, source_slot: u8, preset: &Preset) {
         self.write(host::save_preset(source_slot, preset));
+    }
+
+    /// Import converted NAM data into user AMP `slot` (0–9) the way the official app does: select
+    /// the slot's amp model, write the slot-info record (name, factor), then the 2048 floats.
+    /// Converting a `.nam` file into those floats is not implemented yet (docs/05).
+    pub fn import_user_amp(&self, slot: u8, name: &str, data: &[f32], factor: f32) -> Result<(), UploadError> {
+        upload::check(slot, data)?;
+        if let Some(b) = host::head(Module::Amp, upload::USER_MODEL_BASE + slot, true) {
+            self.send(b);
+        }
+        self.write(upload::user_amp_upload(&UserAmpInfo::new(slot, name, factor), data));
+        Ok(())
+    }
+
+    /// Delete user AMP `slot` and re-read its info, like the official app.
+    pub fn delete_user_amp(&self, slot: u8) -> Result<(), UploadError> {
+        if slot >= upload::USER_SLOTS {
+            return Err(UploadError::Slot(slot));
+        }
+        self.write(vec![upload::user_amp_delete(slot), req::user_amp(slot)]);
+        Ok(())
+    }
+
+    /// Import IR data into user IR `slot` (0–9) the way the official app does: show the CAB page,
+    /// select the slot's cab model, write the 2048 floats, then the name. Only slot 0 has been
+    /// captured; other slots are assumed to work the same way.
+    pub fn import_user_ir(&self, slot: u8, name: &str, data: &[f32]) -> Result<(), UploadError> {
+        upload::check(slot, data)?;
+        self.send(host::page(Module::Cab));
+        if let Some(b) = host::head(Module::Cab, upload::USER_MODEL_BASE + slot, true) {
+            self.send(b);
+        }
+        self.write(upload::user_ir_upload(slot, name, data));
+        Ok(())
     }
 
     /// Write the global settings (read-modify-write: start from the pedal's current record).

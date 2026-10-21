@@ -6,6 +6,7 @@ from . import pack as pack
 from . import queue as queue
 from . import records as records
 from . import state as state
+from . import upload as upload
 
 __version__: str
 USB_ID: tuple[int, int]

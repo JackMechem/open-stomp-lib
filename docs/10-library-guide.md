@@ -50,6 +50,7 @@ Windows need nothing extra. The pedal is class compliant, so no driver is needed
 | [`records`](../src/records.rs) | none | `Preset` (110 B), `Settings` (17 B), user slot names, ASCII helpers | [04](04-data-structures.md) |
 | [`state`](../src/state.rs) | none | `DeviceState`: applies every message, returns a readable `Event` | all |
 | [`queue`](../src/queue.rs) | none | `RequestQueue`: one SysEx in flight, reply matching, timeouts, sync progress; `handshake()` | [03](03-sysex-protocol.md) |
+| [`upload`](../src/upload.rs) | none | User AMP (NAM) / user IR upload framing: chunks, slot-info record, reassembly | [05](05-uploads-nam-ir.md) |
 | [`capture`](../src/capture.rs) | none | Capture log reader | [07](07-capture-methodology.md) |
 | [`device`](../src/device.rs) | MIDI | `Device`: hotplug scan, auto-connect, startup sync, edits, replay | this doc |
 
@@ -235,6 +236,20 @@ dev.save_preset(source, &p);
 This queues the official app's exact sequence ([03](03-sysex-protocol.md)): `0x12` name write (first byte = the
 source slot), `0x0B` preset write (waits for its ack), then a program change to the saved slot. It is tested byte for
 byte against the captured *save as*.
+
+### Uploading a user AMP or IR
+
+```rust
+// data: 2048 converted floats. Converting a .nam / .wav file is not implemented yet (docs/05),
+// but a captured conversion can be uploaded to any slot.
+dev.import_user_amp(2, "Jcm800", &data, 1.0)?;   // USER AMP 03: select model 32, slot info, 61 chunks
+dev.import_user_ir(0, "My Cab", &data)?;         // USER IR 01: CAB page, model 30, 61 chunks, name
+dev.delete_user_amp(2)?;
+```
+
+These send the official app's sequences, tested byte for byte against every captured import. They return an
+`UploadError` for a slot outside 0–9 or data that isn't 2048 finite floats. `upload::Reassembler` turns captured
+chunks back into floats.
 
 ### Changing system settings
 

@@ -8,7 +8,8 @@
 //!   [`midi`] (message parsing, SysEx framing, stream reassembly, request and command builders),
 //!   [`catalog`] (modules, models, parameters), [`records`] (preset and settings records),
 //!   [`state`] (a model of the pedal that every message is applied to), [`queue`] (the
-//!   one-request-at-a-time pacing the pedal needs) and [`capture`] (capture log reader).
+//!   one-request-at-a-time pacing the pedal needs), [`upload`] (user AMP/IR upload framing) and
+//!   [`capture`] (capture log reader).
 //! * **Device** (feature `device`, on by default): [`device`] runs a background engine that finds
 //!   the pedal, connects, performs the startup sync, sends edits and reports everything that
 //!   happens, or replays a capture log instead of a real pedal.
@@ -46,6 +47,7 @@ pub mod pack;
 pub mod queue;
 pub mod records;
 pub mod state;
+pub mod upload;
 
 pub use catalog::Module;
 pub use midi::{Assembler, Msg};

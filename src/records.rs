@@ -222,13 +222,11 @@ pub fn parse_ir_slot(payload: &[u8]) -> Option<(u8, String)> {
     Some((slot, ascii(raw.get(4..)?)))
 }
 
-/// User AMP (NAM) slot info reply payload (whole body packed, name at 12).
+/// User AMP (NAM) slot info reply payload: slot and name. See [`crate::upload::UserAmpInfo`] for
+/// the whole record.
 pub fn parse_user_amp(payload: &[u8]) -> Option<(u8, String)> {
-    let raw = unpack(payload);
-    if raw.get(2) != Some(&4) {
-        return None;
-    }
-    Some((raw[1], ascii(raw.get(12..44.min(raw.len()))?)))
+    let i = crate::upload::UserAmpInfo::parse(payload)?;
+    (crate::upload::Chunk::parse(payload)?.sub == crate::upload::amp_sub::READ_INFO).then_some((i.slot, i.name))
 }
 
 /// Plain 7-bit 14-bit value, high 7 bits first.
