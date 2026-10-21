@@ -29,13 +29,17 @@ include = ["src/", "examples/", "tests/", "docs/", "captures/logs/", "README.md"
 name = "open_stomp"
 
 [features]
-default = ["device"]
+default = ["device", "nam"]
 # MIDI I/O: port discovery, auto-connect, handshake, request pacing, capture replay (midir).
 # Without it the crate is pure encode/decode with no dependencies.
 device = ["dep:midir", "dep:core-foundation-sys"]
+# Neural Amp Modeler: load .nam files and run them (needed to convert NAM models for the pedal).
+nam = ["dep:serde_json", "dep:rustfft"]
 
 [dependencies]
 midir = { version = "0.11", optional = true }
+serde_json = { version = "1", optional = true }
+rustfft = { version = "6", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # pump the engine thread's run loop so CoreMIDI can deliver device add/remove notifications
@@ -48,6 +52,18 @@ required-features = ["device"]
 [[example]]
 name = "ports"
 required-features = ["device"]
+
+[[example]]
+name = "nam_convert"
+required-features = ["nam"]
+
+[[example]]
+name = "nam_check"
+required-features = ["nam"]
+
+[[example]]
+name = "nam_render"
+required-features = ["nam"]
 
 [package.metadata.docs.rs]
 all-features = true

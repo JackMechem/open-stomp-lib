@@ -246,6 +246,26 @@ impl Device {
         Ok(())
     }
 
+    /// Convert a `.nam` file ([`fn@crate::nam::convert`]) and import it into user AMP `slot` (0–9),
+    /// named after the file like the official app does. The conversion runs on the calling thread
+    /// and takes a few seconds (optimised build). Returns the conversion for inspection.
+    #[cfg(feature = "nam")]
+    pub fn import_nam_file(
+        &self,
+        slot: u8,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<crate::nam::Converted, Box<dyn std::error::Error + Send + Sync>> {
+        let path = path.as_ref();
+        if slot >= upload::USER_SLOTS {
+            return Err(Box::new(UploadError::Slot(slot)));
+        }
+        let mut model = crate::nam::Model::load(path)?;
+        let converted = crate::nam::convert(&mut model);
+        let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        self.import_user_amp(slot, &name, &converted.data, converted.factor)?;
+        Ok(converted)
+    }
+
     /// Delete user AMP `slot` and re-read its info, like the official app.
     pub fn delete_user_amp(&self, slot: u8) -> Result<(), UploadError> {
         if slot >= upload::USER_SLOTS {

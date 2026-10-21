@@ -344,6 +344,24 @@ impl Device {
         d.import_user_amp(slot, name, &data, factor).map_err(crate::upload::err)
     }
 
+    /// Convert a `.nam` file and import it into user AMP `slot` (0–9), named after the file.
+    /// Releases the GIL during the conversion (a few seconds). Returns the conversion.
+    fn import_nam_file(&self, py: Python<'_>, slot: u8, path: std::path::PathBuf) -> PyResult<crate::nam::Converted> {
+        // convert without holding the device lock (recv() in other threads keeps working)
+        let converted = py.detach(|| -> Result<_, open_stomp::nam::NamError> {
+            let mut model = open_stomp::nam::Model::load(&path)?;
+            Ok(open_stomp::nam::convert(&mut model))
+        });
+        let converted = converted.map_err(crate::nam::err)?;
+        let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        {
+            let g = self.lock();
+            let d = g.as_ref().ok_or_else(closed)?;
+            d.import_user_amp(slot, &name, &converted.data, converted.factor).map_err(crate::upload::err)?;
+        }
+        Ok(converted.into())
+    }
+
     /// Delete user AMP `slot` and re-read its info.
     fn delete_user_amp(&self, slot: u8) -> PyResult<()> {
         let g = self.lock();

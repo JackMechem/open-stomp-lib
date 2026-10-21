@@ -36,6 +36,7 @@ open-stomp = { path = "../open-stomp-lib", default-features = false }
 | Feature | Default | What it adds |
 |---|---|---|
 | `device` | on | `open_stomp::device`: the engine thread (midir: ALSA on Linux, CoreMIDI on macOS, WinMM on Windows) |
+| `nam` | on | `open_stomp::nam`: run `.nam` models and convert them for the pedal (`serde_json`, `rustfft`) |
 
 Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers (`libasound2-dev` / `alsa-lib-devel`); macOS and
 Windows need nothing extra. The pedal is class compliant, so no driver is needed anywhere.
@@ -52,6 +53,7 @@ Windows need nothing extra. The pedal is class compliant, so no driver is needed
 | [`queue`](../src/queue.rs) | none | `RequestQueue`: one SysEx in flight, reply matching, timeouts, sync progress; `handshake()` | [03](03-sysex-protocol.md) |
 | [`upload`](../src/upload.rs) | none | User AMP (NAM) / user IR upload framing: chunks, slot-info record, reassembly | [05](05-uploads-nam-ir.md) |
 | [`capture`](../src/capture.rs) | none | Capture log reader | [07](07-capture-methodology.md) |
+| [`nam`](../src/nam/mod.rs) | files | `.nam` model loading and inference (NeuralAmpModelerCore port), the NAM → pedal converter | [05](05-uploads-nam-ir.md) |
 | [`device`](../src/device.rs) | MIDI | `Device`: hotplug scan, auto-connect, startup sync, edits, replay | this doc |
 
 The crate root re-exports the everyday types: `Module`, `Msg`, `Assembler`, `Preset`, `Settings`, `DeviceState`,
@@ -237,11 +239,32 @@ This queues the official app's exact sequence ([03](03-sysex-protocol.md)): `0x1
 source slot), `0x0B` preset write (waits for its ack), then a program change to the saved slot. It is tested byte for
 byte against the captured *save as*.
 
+### Importing a NAM model
+
+```rust
+dev.import_nam_file(2, "Jcm800.nam")?;            // convert (~4 s, optimised build) + upload to USER AMP 03
+```
+
+Or step by step, e.g. to inspect or cache the result:
+
+```rust
+use open_stomp::nam::{Model, convert};
+
+let mut model = Model::load("Jcm800.nam")?;
+let c = convert(&mut model);                     // c.data: the 2048 floats, c.factor: 1.0
+dev.import_user_amp(2, "Jcm800", &c.data, c.factor)?;
+```
+
+`Model` also runs the network on your own audio (`model.process(&input, &mut output)`, mono, 48 kHz). The converter
+reproduces the official app's algorithm; with our own test signal the resulting filters are within ~1–1.5 dB rms of
+the app's (the app's own measurement noise, see [05](05-uploads-nam-ir.md#our-implementation)).
+`convert::convert_with(&mut model, &bla_x)` takes the app's excitation instead, for an exact match.
+
 ### Uploading a user AMP or IR
 
 ```rust
-// data: 2048 converted floats. Converting a .nam / .wav file is not implemented yet (docs/05),
-// but a captured conversion can be uploaded to any slot.
+// data: 2048 converted floats (from nam::convert, or a captured conversion).
+// Converting audio files into IR data is not implemented yet (docs/05).
 dev.import_user_amp(2, "Jcm800", &data, 1.0)?;   // USER AMP 03: select model 32, slot info, 61 chunks
 dev.import_user_ir(0, "My Cab", &data)?;         // USER IR 01: CAB page, model 30, 61 chunks, name
 dev.delete_user_amp(2)?;

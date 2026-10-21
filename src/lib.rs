@@ -10,6 +10,8 @@
 //!   [`state`] (a model of the pedal that every message is applied to), [`queue`] (the
 //!   one-request-at-a-time pacing the pedal needs), [`upload`] (user AMP/IR upload framing) and
 //!   [`capture`] (capture log reader).
+//! * **NAM** (feature `nam`, on by default): [`nam`] loads and runs Neural Amp Modeler `.nam`
+//!   models and converts them into the pedal's user AMP format, as the official app does.
 //! * **Device** (feature `device`, on by default): [`device`] runs a background engine that finds
 //!   the pedal, connects, performs the startup sync, sends edits and reports everything that
 //!   happens, or replays a capture log instead of a real pedal.
@@ -43,6 +45,8 @@ pub mod catalog;
 #[cfg(feature = "device")]
 pub mod device;
 pub mod midi;
+#[cfg(feature = "nam")]
+pub mod nam;
 pub mod pack;
 pub mod queue;
 pub mod records;

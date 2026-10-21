@@ -7,6 +7,14 @@ All notable changes to `open-stomp`. The format follows
 ## [Unreleased]
 
 ### Added
+- `nam` feature and module (on by default): load and run Neural Amp Modeler `.nam` models (a
+  pure-Rust port of NeuralAmpModelerCore's WaveNet, plain and `SlimmableContainer`; matches it to
+  ≤ 3e-5 on its example models, which are now test vectors), and `nam::convert`, the official
+  app's NAM → pedal converter: a fundamental/3rd-harmonic tone test and a small-signal linear
+  response give two minimum-phase FIRs. With the app's own excitation the result matches its
+  upload to ≤ 0.03 dB; with ours (the default) within ~1–1.5 dB rms, the app's own measurement
+  noise. `Device::import_nam_file(slot, path)` converts and uploads. Examples `nam_convert`,
+  `nam_render`, `nam_check`. Python: `open_stomp.nam`, `Device.import_nam_file`.
 - `upload` module: user AMP (NAM, SysEx `0x58`) and user IR (`0x10` + `0x09`) upload framing:
   chunking, the 128-byte slot-info record (`UserAmpInfo`: name, factor), delete, and a
   `Reassembler` that turns captured chunks back into floats. Every captured import rebuilds

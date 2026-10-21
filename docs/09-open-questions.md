@@ -4,10 +4,9 @@ Ordered by usefulness for a Linux editor. Each item says how to resolve it.
 
 ## High value
 
-1. **NAM → device conversion** (`imagelib`). **Algorithm solved** and verified stage by stage against the vendor
-   code ([05](05-uploads-nam-ir.md#the-algorithm-namfilethreadrun)). Still to do for an open converter: NAM
-   inference (WaveNet / SlimmableContainer), our own BLA excitation (the vendor's `BLA_x` table can't be regenerated
-   from a seed), then end-to-end tests against the harness.
+1. ~~**NAM → device conversion**~~: solved and implemented (`open_stomp::nam`, [05](05-uploads-nam-ir.md#our-implementation)).
+   Left: hardware confirmation of an upload made by our converter (the transport and data are verified against the
+   app, but not yet heard on the pedal), LSTM/ConvNet NAM models (the app's NAM core supports ConvNet too).
 2. **IR transform.** Capture an upload of a short plain cab IR (< 2048 samples) and compare sample by sample. Also
    record which file was used for the existing capture (the two Tone Charm WAVs are candidates).
 3. **IR slot 4-byte field** (`0x09` record bytes 0–3): a CRC or a flag? It was `01 00 00 00` after an upload.

@@ -21,11 +21,13 @@ cross-platform editor, is built on it.
 * **Encode presets and settings** for writing, keeping unknown bytes intact. Tested byte for byte against the
   official app's captured writes.
 * **Pace requests** the way the pedal needs: one SysEx in flight, reply matching, timeouts (`RequestQueue`, pure).
+* **Import NAM amp models** (feature `nam`): load and run `.nam` files (a Rust port of NeuralAmpModelerCore) and
+  convert them for the pedal with the official app's algorithm, reverse engineered (`Device::import_nam_file`).
 * **Run the connection** (feature `device`): find the pedal, connect, follow hotplug, perform the official app's
   startup sync, send edits, report everything. It can also replay a capture log so you can develop without a pedal.
 
 The protocol layer has no I/O and no dependencies. The device layer uses [`midir`](https://crates.io/crates/midir)
-(ALSA, CoreMIDI, WinMM).
+(ALSA, CoreMIDI, WinMM); the NAM layer uses `serde_json` and `rustfft`.
 
 ## Quick start
 
@@ -120,8 +122,9 @@ amidi -p hw:2,0,0 -d                                # turn knobs on the pedal an
 | Preset record (110 B) | ✅ layout from 99 presets (some bytes unknown) | ✅ decode + encode, unknown bytes kept |
 | Preset rename / save-as | ✅ sequence captured | ✅ `host::save_preset`, byte-exact vs capture |
 | System settings | ✅ (some bytes unknown) | ✅ decode + encode |
-| User AMP (NAM) / user IR upload transport | ✅ chunk protocol decoded | ❌ not yet (slot names are read) |
-| NAM → device-format conversion, IR pre-processing | ❌ open ([docs/05](docs/05-uploads-nam-ir.md)) | ❌ |
+| User AMP (NAM) / user IR upload transport | ✅ chunk protocol decoded | ✅ `upload`, byte-exact vs capture |
+| NAM inference and NAM → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `nam`, verified against the app |
+| IR (audio) → device conversion | ❌ open | ❌ |
 
 Live CCs are verified on hardware. Preset and settings **writes** match the official app byte for byte but have not
 yet been run on hardware from this code. Back up your presets first.
@@ -176,8 +179,10 @@ To release:
 ```
 src/              the library (see docs/10 for the module map)
 bindings/python/  Python bindings (PyO3 + maturin): Rust glue, typed package, tests, examples
-examples/         monitor (live / replay), decode (capture → text), ports (list MIDI ports)
-tests/            capture-driven integration tests (fake pedal, engine replay)
+examples/         monitor (live / replay), decode (capture → text), ports (list MIDI ports),
+                  nam_convert / nam_render / nam_check (NAM conversion, inference, comparisons)
+tests/            capture-driven integration tests (fake pedal, engine replay), NAM inference vs
+                  NeuralAmpModelerCore (tests/data/nam: its MIT example models + reference outputs)
 captures/logs/    capture logs of the official app and the pedal: the test vectors
 docs/             the protocol documentation and the library guide
 ```

@@ -1,8 +1,9 @@
 # 05 — User AMP (NAM) and User IR uploads
 
-Status: **transport fully decoded and implemented** (`open_stomp::upload`, rebuilt byte for byte from every captured
-import); **content conversion NOT yet reversed.** You can upload any 2048 floats (e.g. a captured conversion) to any
-slot, but generating them from a `.nam` / `.wav` file still requires reversing the app's converter (open problem #1).
+Status: **user AMP (NAM) import works end to end**: the transport (`open_stomp::upload`, rebuilt byte for byte from every
+captured import), NAM inference (`open_stomp::nam`, a port of NeuralAmpModelerCore) and the app's converter
+(`open_stomp::nam::convert`, [below](#our-implementation)). **User IR import**: transport done, the audio → 2048 floats
+conversion is not reversed yet.
 
 ## Common chunk format
 
@@ -158,10 +159,40 @@ Steps:
 The rest of `run()` (FIR objects, "match EQ" buffers, the `srand(33)` odd-prime multisine `levelsTesterItem`) sets
 up other features and does not affect the upload.
 
-To build an open converter we need: NAM inference (WaveNet / SlimmableContainer, as used by the bundled
-NeuralAmpModelerCore: port it or bind it), and our own BLA excitation with the same spectrum. Ours can't be
-byte-identical to the vendor's since `BLA_x` can't be regenerated, but at −90 dBFS the BLA is insensitive to the
-phases. That claim is still to be measured with the harness.
+Two quirks are part of what the pedal gets, and the open converter copies both:
+
+* **The DC transient.** The model's output has a DC offset (≈ 3e-4 for both test files, 10× the BLA signal) and the
+  DC blocker starts from zero, so its few-hundred-sample transient leaks into the BLA spectrum. The app's `H` is far
+  from the model's true small-signal response where the transient dominates: about 30–38 dB too high below 100 Hz,
+  5–30 dB above 4 kHz, a few dB in between. G1 and G2 inherit this.
+* **The mirror.** `m[8191−k] = m[k]` (instead of `m[N−k]`) plus taking the real part blends neighbouring bins, so
+  `G1IR`/`G2IR` miss jagged target curves by up to ~1–3 dB per bin (`G1IR` vs `g1GainsDb`: mean 0.01–0.13 dB, std
+  0.5–1.1 dB in the app's own output).
+
+### Our implementation
+
+`open_stomp::nam` (feature `nam`):
+
+* **Inference.** `nam::Model` runs WaveNet models: plain (NAM 0.5 "classic", e.g. the standard A1 architecture) or in a
+  `SlimmableContainer` (0.7, the full-size submodel, as NeuralAmpModelerCore defaults to). Gated and ungated layers,
+  bottleneck, `layer1x1`/`head1x1`, kernel heads. Not supported: LSTM/ConvNet models, FiLM, grouped convolutions,
+  condition DSPs, post-stack heads. It matches NeuralAmpModelerCore to ≤ 3e-5 on its example models
+  (`tests/data/nam/`), and the vendor's own model output to ~1e-6 relative over a whole conversion.
+* **Conversion.** `nam::convert(&mut model)` → `Converted { data: [f32; 2048], factor: 1.0, … }`, about 4 s per model
+  (optimised build). `Device::import_nam_file(slot, path)` converts and uploads.
+
+Accuracy against the official app (the two test files; 1/3-octave magnitude response of the uploaded filters):
+
+| Excitation | g1 | g2 |
+|---|---|---|
+| The app's `BLA_x` (`convert_with`; dump it from your own install with the harness) | ≤ 0.01 dB | ≤ 0.03 dB |
+| Ours (`excitation()`, the default) | 0.7–1.6 dB rms (max 2–7) | 1.0–1.3 dB rms (max 2–4) |
+
+The difference with our excitation is the app's own measurement noise: where the DC transient and the signal
+interfere (roughly 100 Hz – 1 kHz), the result depends on the excitation's phases, so the app itself would give a
+different answer by this much with any other table. Averaging over phases (computable in closed form) was tried and
+is not closer to the app's single measurement. `BLA_x` can't be regenerated (it isn't `rand()`-derived) and is
+vendor data, so it isn't shipped.
 
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
