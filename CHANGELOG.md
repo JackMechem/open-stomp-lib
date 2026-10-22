@@ -21,6 +21,9 @@ All notable changes to `open-stomp`. The format follows
   app's transient-affected one. Re-amp tests on hardware against the real model (Ampeg SVT bass
   model): closer mid scoop, top-end roll-off and upper-note distortion than the official
   algorithm, but still short on the 63–90 Hz resonance and about 5 dB quieter. Not the default.
+- `nam::convert::PEDAL_TAPS`, `upload_data`, `pedal_irs`: the pedal runs only the first 512 taps
+  of each uploaded filter (found by re-amping; docs/05). `Measure::Clean` now uploads exactly
+  those taps, with the ignored halves zeroed; `Measure::App` keeps the app's layout.
 - `nam::convert::official_excitation` / `find_official_excitation`: read the official app's test
   signal from the user's own Stomp Manager install (located by fingerprint; no vendor data in the
   source). With it the conversion equals the official one (error energy −51 to −93 dB on ten

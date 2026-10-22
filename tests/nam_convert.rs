@@ -38,6 +38,12 @@ fn converter_properties() {
     // deterministic
     let again = convert::convert(&mut m);
     assert_eq!(again.data, c.data);
+
+    // Clean mode uploads only the taps the pedal runs
+    let clean = convert::convert_measured(&mut m, &convert::excitation(), convert::Measure::Clean);
+    assert!(clean.data[..512].iter().chain(&clean.data[1024..1536]).all(|&v| v == 0.0));
+    let (h1, h2) = convert::pedal_irs(&clean.data);
+    assert!((h1[0] - clean.g1_ir[0]).abs() < 1e-6 && (h2[511] - clean.g2_ir[511]).abs() < 1e-6);
 }
 
 /// Against the official app, when harness dumps are available locally (they contain vendor and

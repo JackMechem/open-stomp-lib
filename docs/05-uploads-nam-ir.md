@@ -169,6 +169,25 @@ Two quirks are part of what the pedal gets, and the open converter copies both:
   `G1IR`/`G2IR` miss jagged target curves by up to ~1–3 dB per bin (`G1IR` vs `g1GainsDb`: mean 0.01–0.13 dB, std
   0.5–1.1 dB in the app's own output).
 
+### What the pedal runs: 512 taps per filter (2026-10)
+
+Re-amping (a test signal through the pedal and through the real model, see open-stomp-manager `tools/pedalsim`)
+shows that the pedal runs only the **first 512 taps** of each uploaded impulse response: `data[512..1024]` for G1 and
+`data[1536..2048]` for G2 (taps 511..0, reversed). `data[0..512]` and `data[1024..1536]` are ignored. A model of the
+pedal as
+
+    y = G2_512 ⊛ f(G1_512 ⊛ x)
+
+with `f` a fixed piecewise-linear saturation (the same for every user AMP) nulls against the recorded output of the
+official, open and clean uploads to −23.4 … −24.4 dB, the rig's own repeatability (−24.4 dB between two recordings of
+the same upload). With all 1024 taps it can't: the clean conversion's 41 Hz response is then off by ~10 dB. The
+truncation is also why every 1024-tap conversion so far (the official one included) has excess sub-bass on the pedal:
+the cut-off tail of a minimum-phase response carries part of its low end.
+
+`convert::PEDAL_TAPS`, `convert::upload_data` (two responses → upload, unused halves zero) and `convert::pedal_irs`
+(upload → the responses the pedal runs). `Measure::App` keeps the app's 1024-tap layout byte for byte; the other modes
+upload exactly what the pedal runs.
+
 ### Our implementation
 
 `open_stomp::nam` (feature `nam`):

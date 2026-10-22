@@ -12,6 +12,10 @@
 //! 4. Both become minimum-phase impulse responses; the upload is the first 1024 taps of each,
 //!    reversed, and a factor of 1.0.
 //!
+//! The pedal only runs the first [`PEDAL_TAPS`] (512) taps of each uploaded filter (found by
+//! re-amping, docs/05): the app's extra 512 taps per filter are ignored. [`Measure::App`] keeps the
+//! app's layout byte for byte; the other modes upload exactly what the pedal runs ([`upload_data`]).
+//!
 //! Every stage was checked against the vendor code (open-stomp-manager `tools/namconv`). The one
 //! difference is the excitation: the vendor's 8192-sample multisine is a stored table, so
 //! [`excitation`] generates our own with the same spectrum (see [`Converted`] for how close the
@@ -36,6 +40,11 @@ pub const TONE_BINS: [usize; 94] = [
     246, 260, 276, 292, 310, 328, 348, 369, 391, 414, 439, 465, 492, 522, 553, 586, 621, 658, 697, 738, 782, 829, 878,
     931, 986, 1045, 1107, 1173, 1243, 1317, 1395, 1478, 1566, 1660, 1758, 1863, 1974, 2092, 2216, 2348, 2488,
 ];
+/// Impulse-response taps of each uploaded filter that the pedal actually runs. An upload holds
+/// 1024 floats per filter, the response reversed (`data[1023 − k]` is tap `k` of G1,
+/// `data[2047 − k]` of G2), but the pedal uses only taps 0..511 (`data[512..1024]`,
+/// `data[1536..2048]`) and ignores the rest.
+pub const PEDAL_TAPS: usize = 512;
 /// Tones whose 3rd harmonic is measured (3 × bin stays below Nyquist).
 const THIRD_TONES: usize = 83;
 
@@ -57,6 +66,27 @@ pub struct Converted {
     /// The 8192-tap minimum-phase responses before truncation.
     pub g1_ir: Vec<f64>,
     pub g2_ir: Vec<f64>,
+}
+
+/// Upload data for two impulse responses as the pedal runs them: the first [`PEDAL_TAPS`] taps of
+/// each, reversed, in the second half of each 1024-float block; the halves the pedal ignores are 0.
+pub fn upload_data(g1_ir: &[f64], g2_ir: &[f64]) -> Vec<f32> {
+    let block = |ir: &[f64]| {
+        let mut b = vec![0.0f32; 1024];
+        for (k, &v) in ir.iter().take(PEDAL_TAPS).enumerate() {
+            b[1023 - k] = v as f32;
+        }
+        b
+    };
+    [block(g1_ir), block(g2_ir)].concat()
+}
+
+/// The two impulse responses the pedal actually runs for 2048 floats of upload data
+/// ([`PEDAL_TAPS`] taps each; the inverse of [`upload_data`]).
+pub fn pedal_irs(data: &[f32]) -> (Vec<f64>, Vec<f64>) {
+    assert_eq!(data.len(), 2048, "upload data is 2048 floats");
+    let ir = |b: &[f32]| (0..PEDAL_TAPS).map(|k| b[1023 - k] as f64).collect();
+    (ir(&data[..1024]), ir(&data[1024..]))
 }
 
 /// The DC blocker the app applies to every model output; its state carries over between calls.
@@ -298,7 +328,8 @@ pub enum Measure {
     #[default]
     App,
     /// The excitation played twice and measured on the second, steady-state period: no transient,
-    /// the model's actual small-signal response at every frequency. Departs from the app on purpose.
+    /// the model's actual small-signal response at every frequency. Departs from the app on purpose,
+    /// and uploads only the taps the pedal runs ([`upload_data`]).
     Clean,
 }
 
@@ -377,7 +408,11 @@ pub fn convert_measured(model: &mut Model, bla_x: &[f32], measure: Measure) -> C
     let g1_db = interp_log(&g1_gains_db, &TONE_BINS);
     let g2_db: Vec<f64> = h_db.iter().zip(&g1_db).map(|(a, b)| a - b).collect();
     let (g1_ir, g2_ir) = (fft.min_phase(&g1_db), fft.min_phase(&g2_db));
-    let data = g1_ir[..1024].iter().rev().chain(g2_ir[..1024].iter().rev()).map(|&v| v as f32).collect();
+    let data = match measure {
+        // the app's layout, byte for byte (the pedal ignores the first 512 floats of each block)
+        Measure::App => g1_ir[..1024].iter().rev().chain(g2_ir[..1024].iter().rev()).map(|&v| v as f32).collect(),
+        Measure::Clean => upload_data(&g1_ir, &g2_ir),
+    };
     Converted { data, factor: 1.0, levels, levels3, bla_db: h_db, g1_gains_db, g1_ir, g2_ir }
 }
 
@@ -421,6 +456,19 @@ mod tests {
         let g = interp_log(&[0.0, 6.0, 12.0], &bins);
         assert!((g[14] - 6.0 * (14f64 / 10.0).log10() / 2f64.log10()).abs() < 1e-12);
         assert_eq!((g[0], g[4095]), (0.0, 12.0));
+    }
+
+    #[test]
+    fn upload_layout() {
+        let g1: Vec<f64> = (0..2000).map(|k| k as f64 + 1.0).collect();
+        let g2: Vec<f64> = (0..2000).map(|k| -(k as f64) - 1.0).collect();
+        let d = upload_data(&g1, &g2);
+        assert_eq!(d.len(), 2048);
+        assert!(d[..512].iter().chain(&d[1024..1536]).all(|&v| v == 0.0));
+        assert_eq!((d[1023], d[512], d[2047], d[1536]), (1.0, 512.0, -1.0, -512.0));
+        let (h1, h2) = pedal_irs(&d);
+        assert_eq!((h1.len(), h2.len()), (PEDAL_TAPS, PEDAL_TAPS));
+        assert!(h1.iter().zip(&g1).chain(h2.iter().zip(&g2)).all(|(a, b)| a == b));
     }
 
     #[test]
