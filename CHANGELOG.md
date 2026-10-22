@@ -6,6 +6,8 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - Unreleased
+
 ### Added
 - NAM import level normalisation, like NAM plugins: `nam::convert::normalise_level` scales G2 (after the pedal's
   saturation, so a pure volume change) so that every model plays at the same level, `NORMALISED_LEVEL_DB`,
@@ -15,8 +17,6 @@ All notable changes to `open-stomp`. The format follows
   `Device::import_nam_file`; `Device::import_nam_file_as(.., normalise)`, Python `nam.convert(..., normalise=True)`
   and `Device.import_nam_file(..., normalise=...)`. `nam::Model::loudness` (the file's metadata). Example
   `nam_level`.
-
-### Added
 - `ir` module: read and write WAV files (`Wav`: PCM 8–32-bit and float, any channel count), and `convert`, the
   official app's IR conversion recovered from its native code: files that aren't 48 kHz mono 24-bit are converted
   first (first channel, JUCE's resampler, `resample_like_app`, 24-bit), then the first 2048 samples are reversed and
@@ -124,7 +124,8 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JackMechem/open-stomp-lib/releases/tag/v0.1.0
