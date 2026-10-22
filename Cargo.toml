@@ -62,6 +62,10 @@ name = "nam_check"
 required-features = ["nam"]
 
 [[example]]
+name = "nam_optimise"
+required-features = ["nam"]
+
+[[example]]
 name = "nam_render"
 required-features = ["nam"]
 

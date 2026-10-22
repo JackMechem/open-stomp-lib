@@ -18,9 +18,6 @@
 //! A port of open-stomp-manager `tools/pedalsim` (PyTorch); `tests/data/optim` holds its reference
 //! values.
 
-// the optimiser loop that uses the rest comes in the next step of the port
-#![allow(dead_code)]
-
 use std::sync::Arc;
 
 use rustfft::num_complex::Complex64;
@@ -135,79 +132,135 @@ impl Conv {
     /// The block spectra of a signal: block `b` covers `x[b·HOP − HIST .. b·HOP − HIST + BLOCK]`
     /// (zero outside the signal).
     fn signal(&self, x: &[f64]) -> Vec<Vec<Complex64>> {
-        (0..Self::blocks(x.len()))
-            .map(|b| {
-                let s = (b * HOP) as isize - HIST as isize;
-                let mut v: Vec<Complex64> = (0..BLOCK as isize)
-                    .map(|j| {
-                        let i = s + j;
-                        Complex64::new(if i >= 0 && (i as usize) < x.len() { x[i as usize] } else { 0.0 }, 0.0)
-                    })
-                    .collect();
-                self.fwd.process(&mut v);
-                v
-            })
-            .collect()
+        par_chunks(Self::blocks(x.len()), |blocks| {
+            blocks
+                .map(|b| {
+                    let s = (b * HOP) as isize - HIST as isize;
+                    let mut v: Vec<Complex64> = (0..BLOCK as isize)
+                        .map(|j| {
+                            let i = s + j;
+                            Complex64::new(if i >= 0 && (i as usize) < x.len() { x[i as usize] } else { 0.0 }, 0.0)
+                        })
+                        .collect();
+                    self.fwd.process(&mut v);
+                    v
+                })
+                .collect::<Vec<_>>()
+        })
+        .concat()
     }
 
     /// `y = h ⊛ x` (first `len` samples), from the block spectra of `x`.
     fn apply(&self, blocks: &[Vec<Complex64>], h: &[Complex64], len: usize) -> Vec<f64> {
-        let mut y = vec![0.0; len];
-        let mut buf = vec![Complex64::default(); BLOCK];
-        for (b, xb) in blocks.iter().enumerate() {
-            for ((o, a), c) in buf.iter_mut().zip(xb).zip(h) {
-                *o = a * c;
+        let mut y = par_chunks(blocks.len(), |range| {
+            let mut out = Vec::with_capacity(range.len() * HOP);
+            let mut buf = vec![Complex64::default(); BLOCK];
+            for xb in &blocks[range] {
+                for ((o, a), c) in buf.iter_mut().zip(xb).zip(h) {
+                    *o = a * c;
+                }
+                self.inv.process(&mut buf);
+                out.extend(buf[HIST..].iter().map(|v| v.re / BLOCK as f64));
             }
-            self.inv.process(&mut buf);
-            let s = b * HOP;
-            for (j, o) in y[s..(s + HOP).min(len)].iter_mut().enumerate() {
-                *o = buf[HIST + j].re / BLOCK as f64;
-            }
-        }
+            out
+        })
+        .concat();
+        y.truncate(len);
         y
     }
 
     /// The adjoint of [`Conv::apply`] for the signal: `gx[m] = Σ_k h[k]·g[m + k]`.
     fn correlate(&self, g: &[f64], h: &[Complex64]) -> Vec<f64> {
-        let len = g.len();
-        let mut gx = vec![0.0; len];
-        let mut buf = vec![Complex64::default(); BLOCK];
-        for b in 0..Self::blocks(len) {
-            let s = b * HOP;
-            for (j, o) in buf.iter_mut().enumerate() {
-                *o = Complex64::new(g.get(s + j).copied().unwrap_or(0.0), 0.0);
+        let mut gx = par_chunks(Self::blocks(g.len()), |range| {
+            let mut out = Vec::with_capacity(range.len() * HOP);
+            let mut buf = vec![Complex64::default(); BLOCK];
+            for b in range {
+                let s = b * HOP;
+                for (j, o) in buf.iter_mut().enumerate() {
+                    *o = Complex64::new(g.get(s + j).copied().unwrap_or(0.0), 0.0);
+                }
+                self.fwd.process(&mut buf);
+                for (o, c) in buf.iter_mut().zip(h) {
+                    *o *= c.conj();
+                }
+                self.inv.process(&mut buf);
+                out.extend(buf[..HOP].iter().map(|v| v.re / BLOCK as f64));
             }
-            self.fwd.process(&mut buf);
-            for (o, c) in buf.iter_mut().zip(h) {
-                *o *= c.conj();
-            }
-            self.inv.process(&mut buf);
-            for (j, o) in gx[s..(s + HOP).min(len)].iter_mut().enumerate() {
-                *o = buf[j].re / BLOCK as f64;
-            }
-        }
+            out
+        })
+        .concat();
+        gx.truncate(g.len());
         gx
     }
 
     /// The adjoint of [`Conv::apply`] for the filter: `gh[k] = Σ_n g[n]·x[n − k]`, `k <`
     /// [`PEDAL_TAPS`], from the block spectra of `x`.
     fn filter_grad(&self, blocks: &[Vec<Complex64>], g: &[f64]) -> Vec<f64> {
+        let parts = par_chunks(blocks.len(), |range| {
+            let mut acc = vec![Complex64::default(); BLOCK];
+            let mut buf = vec![Complex64::default(); BLOCK];
+            for b in range {
+                let s = b * HOP;
+                buf.fill(Complex64::default());
+                for (j, &v) in g[s..(s + HOP).min(g.len())].iter().enumerate() {
+                    buf[HIST + j].re = v;
+                }
+                self.fwd.process(&mut buf);
+                for ((a, gb), xc) in acc.iter_mut().zip(&buf).zip(&blocks[b]) {
+                    *a += gb * xc.conj();
+                }
+            }
+            acc
+        });
         let mut acc = vec![Complex64::default(); BLOCK];
-        let mut buf = vec![Complex64::default(); BLOCK];
-        for (b, xb) in blocks.iter().enumerate() {
-            let s = b * HOP;
-            buf.fill(Complex64::default());
-            for (j, &v) in g[s..(s + HOP).min(g.len())].iter().enumerate() {
-                buf[HIST + j].re = v;
-            }
-            self.fwd.process(&mut buf);
-            for ((a, gb), xc) in acc.iter_mut().zip(&buf).zip(xb) {
-                *a += gb * xc.conj();
-            }
+        for p in parts {
+            acc.iter_mut().zip(p).for_each(|(a, v)| *a += v);
         }
         self.inv.process(&mut acc);
         acc[..PEDAL_TAPS].iter().map(|c| c.re / BLOCK as f64).collect()
     }
+}
+
+/// `f` on contiguous ranges covering `0..n`, one per thread, results in order.
+fn par_chunks<T: Send>(n: usize, f: impl Fn(std::ops::Range<usize>) -> T + Sync) -> Vec<T> {
+    let threads = std::thread::available_parallelism().map_or(1, |t| t.get()).clamp(1, 16).min(n.max(1));
+    let per = n.div_ceil(threads);
+    if threads == 1 {
+        return vec![f(0..n)];
+    }
+    std::thread::scope(|s| {
+        let f = &f;
+        let handles: Vec<_> =
+            (0..threads).map(|t| s.spawn(move || f((t * per).min(n)..((t + 1) * per).min(n)))).collect();
+        handles.into_iter().map(|h| h.join().expect("optimiser thread")).collect()
+    })
+}
+
+/// `f(i)` for `i` in `0..n` on all threads (work-stealing), results in order.
+fn par_map<T: Send>(n: usize, f: impl Fn(usize) -> T + Sync) -> Vec<T> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let next = AtomicUsize::new(0);
+    let threads = std::thread::available_parallelism().map_or(1, |t| t.get()).clamp(1, 16).min(n.max(1));
+    let mut done: Vec<(usize, T)> = std::thread::scope(|s| {
+        let (f, next) = (&f, &next);
+        let handles: Vec<_> = (0..threads)
+            .map(|_| {
+                s.spawn(move || {
+                    let mut v = Vec::new();
+                    loop {
+                        let i = next.fetch_add(1, Ordering::Relaxed);
+                        if i >= n {
+                            return v;
+                        }
+                        v.push((i, f(i)));
+                    }
+                })
+            })
+            .collect();
+        handles.into_iter().flat_map(|h| h.join().expect("optimiser thread")).collect()
+    });
+    done.sort_by_key(|(i, _)| *i);
+    done.into_iter().map(|(_, t)| t).collect()
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -658,27 +711,36 @@ impl SpecLoss {
     /// The loss of `y` and its gradient (added to `gy`).
     fn value_grad(&self, y: &[f64], gy: &mut [f64]) -> f64 {
         let scale = 1.0 / (self.parts.len() * self.res.len()) as f64;
-        let mut tot = 0.0;
-        for (a, b, eps, logs) in &self.parts {
-            for (r, t) in self.res.iter().zip(logs) {
-                let e = eps * (r.n as f64).sqrt();
-                let mut s = r.stft(&y[*a..*b]);
-                let k = scale / s.len() as f64;
-                let mut sum = 0.0;
-                for (c, t) in s.iter_mut().zip(t) {
-                    let m = c.norm();
-                    let d = (m + e).ln() - t;
-                    sum += d.abs();
-                    // d|d|/dS = sign(d) / (|S| + e) · S / |S|
-                    *c = if m > 0.0 { *c * (k * d.signum() / ((m + e) * m)) } else { Complex64::default() };
-                }
-                tot += sum / s.len() as f64;
-                r.stft_adjoint(&s, &mut gy[*a..*b]);
+        // one task per segment and resolution, biggest first
+        let tasks: Vec<(usize, usize)> = (0..self.parts.len()).flat_map(|p| (0..self.res.len()).map(move |r| (p, r))).collect();
+        let results = par_map(tasks.len(), |i| {
+            let (p, r) = tasks[i];
+            let ((a, b, eps, logs), res) = (&self.parts[p], &self.res[r]);
+            let e = eps * (res.n as f64).sqrt();
+            let mut s = res.stft(&y[*a..*b]);
+            let k = scale / s.len() as f64;
+            let mut sum = 0.0;
+            for (c, t) in s.iter_mut().zip(&logs[r]) {
+                let m = c.norm();
+                let d = (m + e).ln() - t;
+                sum += d.abs();
+                // d|d|/dS = sign(d) / (|S| + e) · S / |S|
+                *c = if m > 0.0 { *c * (k * d.signum() / ((m + e) * m)) } else { Complex64::default() };
             }
+            let mut g = vec![0.0; b - a];
+            res.stft_adjoint(&s, &mut g);
+            (sum / s.len() as f64, g)
+        });
+        let mut tot = 0.0;
+        for ((p, _), (v, g)) in tasks.iter().zip(results) {
+            tot += v;
+            let a = self.parts[*p].0;
+            gy[a..a + g.len()].iter_mut().zip(g).for_each(|(o, v)| *o += v);
         }
         tot * scale
     }
 
+    #[cfg(test)]
     /// The loss of `y` (mean over segments and resolutions of the mean absolute log difference).
     fn value(&self, y: &[f64]) -> f64 {
         let mut tot = 0.0;
@@ -696,6 +758,140 @@ impl SpecLoss {
 /// The part of each training segment the loss looks at.
 fn train_slices(segments: &[Segment]) -> Vec<(usize, usize)> {
     segments.iter().filter(|s| s.train).map(|s| (s.start + TRIM, s.start + s.len - TRIM)).collect()
+}
+
+// ---------------------------------------------------------------------------------------------
+// the fit
+
+/// Optimiser settings (the defaults are the ones validated on hardware).
+#[derive(Clone, Debug)]
+pub struct Options {
+    /// Adam steps.
+    pub steps: usize,
+    /// Peak learning rate (in natural-log magnitude per step), reached after `warmup` steps and
+    /// then decayed to 0 along a half cosine.
+    pub learning_rate: f64,
+    pub warmup: usize,
+    /// Weight of the curve smoothness term (mean squared second difference of each curve).
+    pub smoothness: f64,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options { steps: 300, learning_rate: 0.05, warmup: 10, smoothness: 1e-3 }
+    }
+}
+
+/// The result of [`optimise`].
+#[derive(Clone, Debug)]
+pub struct Optimised {
+    /// The 2048 floats to upload ([`upload_data`](super::convert::upload_data) of the responses).
+    pub data: Vec<f32>,
+    /// G1 and G2 as the pedal runs them ([`PEDAL_TAPS`] taps).
+    pub g1_ir: Vec<f64>,
+    pub g2_ir: Vec<f64>,
+    /// The two curves: natural-log magnitude at the [`CURVE_POINTS`] control points.
+    pub g1_curve: Vec<f64>,
+    pub g2_curve: Vec<f64>,
+    /// The objective at the start and per step; the result is the lowest one seen.
+    pub initial_loss: f64,
+    pub loss: Vec<f64>,
+}
+
+/// Something for G1 and G2.
+type Pair = [Vec<f64>; 2];
+
+/// A fitting problem: a signal, the target output for it and the parts to compare.
+struct Problem {
+    sim: Simulator,
+    loss: SpecLoss,
+    curves: Curves,
+}
+
+/// One evaluation of the objective.
+struct Eval {
+    value: f64,
+    grads: [Vec<f64>; 2],
+    irs: [Vec<f64>; 2],
+}
+
+impl Problem {
+    fn new(x: &[f64], target: &[f64], slices: &[(usize, usize)]) -> Self {
+        Problem { sim: Simulator::new(x), loss: SpecLoss::new(target, slices), curves: Curves::new() }
+    }
+
+    /// The objective for two curves, and its gradient w.r.t. them.
+    fn evaluate(&self, c: &[Vec<f64>; 2], smoothness: f64) -> Eval {
+        let d = [self.curves.design(&c[0]), self.curves.design(&c[1])];
+        let run = self.sim.run(&d[0].h, &d[1].h);
+        let mut gy = vec![0.0; run.y.len()];
+        let mut value = self.loss.value_grad(&run.y, &mut gy) + penalty(&run.u);
+        let (gh1, gh2) = self.sim.backward(&run, &d[1].h, &gy);
+        let mut grads = [self.curves.backward(&d[0], &gh1), self.curves.backward(&d[1], &gh2)];
+        for (cv, g) in c.iter().zip(&mut grads) {
+            let n = (cv.len() - 2) as f64;
+            for i in 0..cv.len() - 2 {
+                let dd = cv[i] - 2.0 * cv[i + 1] + cv[i + 2];
+                value += smoothness * dd * dd / n;
+                let k = smoothness * 2.0 * dd / n;
+                g[i] += k;
+                g[i + 1] -= 2.0 * k;
+                g[i + 2] += k;
+            }
+        }
+        let [Design { h: h1, .. }, Design { h: h2, .. }] = d;
+        Eval { value, grads, irs: [h1, h2] }
+    }
+
+    /// Adam from curves `c`; returns the best curves and responses seen, and the objective per step.
+    fn fit(&self, mut c: Pair, o: &Options) -> (Pair, Pair, Vec<f64>) {
+        let (b1, b2, eps) = (0.9, 0.999, 1e-8);
+        let mut m = [vec![0.0; CURVE_POINTS], vec![0.0; CURVE_POINTS]];
+        let mut v = m.clone();
+        let mut history = Vec::with_capacity(o.steps);
+        let mut best: Option<(f64, Pair, Pair)> = None;
+        for it in 0..o.steps {
+            let lr = o.learning_rate
+                * ((it + 1) as f64 / o.warmup.max(1) as f64).min(1.0)
+                * 0.5
+                * (1.0 + (std::f64::consts::PI * it as f64 / o.steps as f64).cos());
+            let e = self.evaluate(&c, o.smoothness);
+            history.push(e.value);
+            if best.as_ref().is_none_or(|b| e.value < b.0) {
+                best = Some((e.value, c.clone(), e.irs));
+            }
+            let t = (it + 1) as i32;
+            let (bc1, bc2) = (1.0 - f64::powi(b1, t), 1.0 - f64::powi(b2, t));
+            for j in 0..2 {
+                for i in 0..CURVE_POINTS {
+                    let g = e.grads[j][i];
+                    m[j][i] = b1 * m[j][i] + (1.0 - b1) * g;
+                    v[j][i] = b2 * v[j][i] + (1.0 - b2) * g * g;
+                    c[j][i] -= lr / bc1 * m[j][i] / ((v[j][i] / bc2).sqrt() + eps);
+                }
+            }
+        }
+        let (_, bc, birs) = best.unwrap_or_else(|| {
+            let e = self.evaluate(&c, o.smoothness);
+            (e.value, c.clone(), e.irs)
+        });
+        (bc, birs, history)
+    }
+}
+
+/// Fit G1/G2 so the simulated pedal matches `model`, starting from the responses in `init` (2048
+/// floats of upload data, normally a [`Measure::Clean`](super::convert::Measure::Clean)
+/// conversion). Runs the model over the test signal once, then `options.steps` simulations; about
+/// a minute per 300 steps in an optimised build.
+pub fn optimise(model: &mut Model, init: &[f32], options: &Options) -> Optimised {
+    let signal = test_signal();
+    let target = render_target(model, &signal.x);
+    let problem = Problem::new(&signal.x, &target, &train_slices(&signal.segments));
+    let (h1, h2) = super::convert::pedal_irs(init);
+    let c0 = [problem.curves.of(&h1), problem.curves.of(&h2)];
+    let initial_loss = problem.evaluate(&c0, options.smoothness).value;
+    let ([g1_curve, g2_curve], [g1_ir, g2_ir], loss) = problem.fit(c0, options);
+    Optimised { data: super::convert::upload_data(&g1_ir, &g2_ir), g1_ir, g2_ir, g1_curve, g2_curve, initial_loss, loss }
 }
 
 #[cfg(test)]
@@ -871,6 +1067,18 @@ mod tests {
             let num = (loss.value(&p) - loss.value(&m)) / (2.0 * d);
             assert!((num - gy[i]).abs() < 1e-4 * num.abs().max(1e-6), "sample {i}: {num} vs {}", gy[i]);
         }
+    }
+
+    #[test]
+    fn optimiser_steps_match_reference() {
+        let problem = Problem::new(&golden("sim_x"), &golden("sim_tgt"), &golden_slices());
+        let c0 = golden("opt_c0");
+        let want = golden("opt_loss");
+        let o = Options { steps: want.len(), ..Options::default() };
+        let c = [c0[..CURVE_POINTS].to_vec(), c0[CURVE_POINTS..].to_vec()];
+        // each loss after the first follows an Adam step, so this checks the updates too
+        let (_, _, history) = problem.fit(c, &o);
+        assert!(rel_err(&history, &want) < 1e-9, "{history:?} vs {want:?}");
     }
 
     #[test]
