@@ -344,13 +344,17 @@ impl Device {
         d.import_user_amp(slot, name, &data, factor).map_err(crate::upload::err)
     }
 
-    /// Convert a `.nam` file and import it into user AMP `slot` (0–9), named after the file.
+    /// Convert a `.nam` file and import it into user AMP `slot` (0–9), named after the file. Uses
+    /// the official app's excitation if Stomp Manager is installed (exact official result).
     /// Releases the GIL during the conversion (a few seconds). Returns the conversion.
     fn import_nam_file(&self, py: Python<'_>, slot: u8, path: std::path::PathBuf) -> PyResult<crate::nam::Converted> {
         // convert without holding the device lock (recv() in other threads keeps working)
         let converted = py.detach(|| -> Result<_, open_stomp::nam::NamError> {
             let mut model = open_stomp::nam::Model::load(&path)?;
-            Ok(open_stomp::nam::convert(&mut model))
+            Ok(match open_stomp::nam::convert::find_official_excitation() {
+                Some(x) => open_stomp::nam::convert::convert_with(&mut model, &x),
+                None => open_stomp::nam::convert(&mut model),
+            })
         });
         let converted = converted.map_err(crate::nam::err)?;
         let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();

@@ -258,7 +258,14 @@ dev.import_user_amp(2, "Jcm800", &c.data, c.factor)?;
 `Model` also runs the network on your own audio (`model.process(&input, &mut output)`, mono, 48 kHz). The converter
 reproduces the official app's algorithm; with our own test signal the resulting filters are within ~1–1.5 dB rms of
 the app's (the app's own measurement noise, see [05](05-uploads-nam-ir.md#our-implementation)).
-`convert::convert_with(&mut model, &bla_x)` takes the app's excitation instead, for an exact match.
+For an exact match with the official app, use its own test signal from an installed Stomp Manager:
+
+```rust
+let x = convert::official_excitation("/Applications/Stomp Manager.app")?; // or find_official_excitation()
+let c = convert::convert_with(&mut model, &x);                          // = the official conversion
+```
+
+`dev.import_nam_file` does this automatically when the app is installed in a standard location.
 
 ### Uploading a user AMP or IR
 

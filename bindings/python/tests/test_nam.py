@@ -42,3 +42,13 @@ def test_errors():
         nam.Model.load("/no/such/model.nam")
     with pytest.raises(ValueError):
         nam.Model.from_json('{"architecture": "LSTM", "config": {}, "weights": []}')
+
+
+def test_official_excitation_when_installed():
+    try:
+        x = nam.official_excitation()
+    except ValueError:
+        pytest.skip("Stomp Manager is not installed")
+    assert len(x) == nam.FFT_SIZE and max(abs(v) for v in x) < 1e-4
+    with pytest.raises(ValueError):
+        nam.official_excitation(DATA)          # no table in the test data

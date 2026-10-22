@@ -187,6 +187,10 @@ dev.import_user_amp(2, "Jcm800", c.data, c.factor)
 out = model.process(samples)                  # run the network on your own audio (mono, 48 kHz)
 ```
 
+For an exact match with the official app, pass its own test signal, read from an installed Stomp Manager:
+`nam.convert(model, excitation=nam.official_excitation())` (or `official_excitation("/path/to/Stomp Manager.app")`).
+`dev.import_nam_file` does this automatically when the app is installed in a standard location.
+
 `Converted` also has every intermediate stage (`levels`, `levels3`, `bla_db`, `g1_gains_db`, `g1_ir`, `g2_ir`).
 
 ### Uploading a user AMP or IR

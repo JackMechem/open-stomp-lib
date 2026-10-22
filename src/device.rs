@@ -247,7 +247,9 @@ impl Device {
     }
 
     /// Convert a `.nam` file ([`fn@crate::nam::convert`]) and import it into user AMP `slot` (0–9),
-    /// named after the file like the official app does. The conversion runs on the calling thread
+    /// named after the file like the official app does. If the official Stomp Manager is installed
+    /// in a standard location, its excitation is used, so the result matches the official app's
+    /// conversion exactly ([`crate::nam::convert::find_official_excitation`]). The conversion runs on the calling thread
     /// and takes a few seconds (optimised build). Returns the conversion for inspection.
     #[cfg(feature = "nam")]
     pub fn import_nam_file(
@@ -260,7 +262,11 @@ impl Device {
             return Err(Box::new(UploadError::Slot(slot)));
         }
         let mut model = crate::nam::Model::load(path)?;
-        let converted = crate::nam::convert(&mut model);
+        // the official app's excitation when it's installed (exact official result), else ours
+        let converted = match crate::nam::convert::find_official_excitation() {
+            Some(x) => crate::nam::convert::convert_with(&mut model, &x),
+            None => crate::nam::convert(&mut model),
+        };
         let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         self.import_user_amp(slot, &name, &converted.data, converted.factor)?;
         Ok(converted)

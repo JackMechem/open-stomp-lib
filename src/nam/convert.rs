@@ -182,6 +182,86 @@ fn interp_log(values: &[f64], bins: &[usize]) -> Vec<f64> {
     out
 }
 
+/// First 8 bytes and FNV-1a 64-bit hash of the official app's 8192-sample BLA excitation (its
+/// `BLA_x` table, float32 little-endian). Only this fingerprint is in the source: the table itself
+/// is vendor data, read from the user's own copy of the app by [`official_excitation`].
+const OFFICIAL_PREFIX: [u8; 8] = [0xcf, 0xc0, 0x91, 0x37, 0x11, 0x79, 0x17, 0x37];
+const OFFICIAL_FNV1A64: u64 = 0x4aa0_4ced_5cff_86d2;
+
+fn fnv1a64(b: &[u8]) -> u64 {
+    b.iter().fold(0xcbf2_9ce4_8422_2325, |h, &c| (h ^ c as u64).wrapping_mul(0x0100_0000_01b3))
+}
+
+/// Find the official app's BLA excitation in one file's bytes.
+fn find_official(bytes: &[u8]) -> Option<Vec<f32>> {
+    let len = N * 4;
+    let mut i = 0;
+    while i + len <= bytes.len() {
+        match bytes[i..bytes.len() - len + OFFICIAL_PREFIX.len()].windows(8).position(|w| w == OFFICIAL_PREFIX) {
+            None => return None,
+            Some(p) => {
+                let at = i + p;
+                let table = &bytes[at..at + len];
+                if fnv1a64(table) == OFFICIAL_FNV1A64 {
+                    return Some(table.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().expect("4"))).collect());
+                }
+                i = at + 1;
+            }
+        }
+    }
+    None
+}
+
+/// Read the official app's BLA excitation from an installed copy of Stomp Manager: a file (macOS
+/// `imagelib.framework/imagelib`) or a directory searched recursively (the `.app` bundle on macOS,
+/// the install folder on Windows). Nothing is executed; the table is located by a fingerprint.
+///
+/// With it, [`convert_with`] reproduces the official app's conversion (≤ 0.03 dB). Without it, the
+/// result differs by the measurement noise of the app's method (see [`convert`]): no other
+/// excitation, including one with the same spectrum, gets closer.
+pub fn official_excitation(path: impl AsRef<std::path::Path>) -> Result<Vec<f32>, super::NamError> {
+    fn search(p: &std::path::Path, depth: usize) -> Option<Vec<f32>> {
+        let meta = std::fs::symlink_metadata(p).ok()?;
+        if meta.is_file() {
+            // the table lives in a native library of a few MB; skip big media files
+            return (meta.len() < 200 << 20).then(|| std::fs::read(p).ok()).flatten().and_then(|b| find_official(&b));
+        }
+        if meta.is_dir() && depth < 12 {
+            let mut entries: Vec<_> = std::fs::read_dir(p).ok()?.filter_map(|e| e.ok().map(|e| e.path())).collect();
+            // look at likely places first
+            entries.sort_by_key(|e| {
+                let n = e.to_string_lossy().to_lowercase();
+                !(n.contains("imagelib") || n.contains("frameworks") || n.ends_with(".dll"))
+            });
+            return entries.iter().find_map(|e| search(e, depth + 1));
+        }
+        None
+    }
+    let p = path.as_ref();
+    search(p, 0).ok_or_else(|| {
+        super::NamError::Format(format!("no Stomp Manager BLA excitation found in {}", p.display()))
+    })
+}
+
+/// Standard install locations of the official app, for [`official_excitation`].
+pub fn official_app_locations() -> Vec<std::path::PathBuf> {
+    let mut v = vec![std::path::PathBuf::from("/Applications/Stomp Manager.app")];
+    if let Some(home) = std::env::var_os("HOME") {
+        v.push(std::path::Path::new(&home).join("Applications/Stomp Manager.app"));
+    }
+    for var in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
+        if let Some(dir) = std::env::var_os(var) {
+            v.push(std::path::Path::new(&dir).join("Stomp Manager"));
+        }
+    }
+    v
+}
+
+/// [`official_excitation`] from the first standard install location that has it.
+pub fn find_official_excitation() -> Option<Vec<f32>> {
+    official_app_locations().iter().filter(|p| p.exists()).find_map(|p| official_excitation(p).ok())
+}
+
 /// Our BLA excitation: the same spectrum as the app's (amplitude `√(1/max(f, 40 Hz))` per bin,
 /// overall scale 1e-5, about −90 dBFS peak), with phases from a fixed-seed generator.
 pub fn excitation() -> Vec<f32> {
@@ -222,7 +302,9 @@ pub enum Measure {
     Clean,
 }
 
-/// Convert a model with our excitation (see [`excitation`]), the app's way.
+/// Convert a model with our excitation (see [`excitation`]), the app's way. Differs from the
+/// official app's result by the app's own measurement noise (1/3-octave response typically within
+/// 0.1–1.5 dB). For an exact match, use [`convert_with`] and [`official_excitation`].
 pub fn convert(model: &mut Model) -> Converted {
     convert_with(model, &excitation())
 }
@@ -339,6 +421,17 @@ mod tests {
         let g = interp_log(&[0.0, 6.0, 12.0], &bins);
         assert!((g[14] - 6.0 * (14f64 / 10.0).log10() / 2f64.log10()).abs() < 1e-12);
         assert_eq!((g[0], g[4095]), (0.0, 12.0));
+    }
+
+    #[test]
+    fn official_fingerprint_search() {
+        // a synthetic "table" with the right prefix but wrong contents is rejected
+        let mut fake = vec![0u8; 100];
+        fake.extend_from_slice(&OFFICIAL_PREFIX);
+        fake.resize(100 + N * 4 + 50, 7);
+        assert!(find_official(&fake).is_none());
+        assert!(find_official(&[1, 2, 3]).is_none());
+        assert_eq!(fnv1a64(b""), 0xcbf2_9ce4_8422_2325);
     }
 
     #[test]

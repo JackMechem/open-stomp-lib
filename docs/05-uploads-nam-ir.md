@@ -185,7 +185,7 @@ Accuracy against the official app (the two test files; 1/3-octave magnitude resp
 
 | Excitation | g1 | g2 |
 |---|---|---|
-| The app's `BLA_x` (`convert_with`; dump it from your own install with the harness) | ≤ 0.01 dB | ≤ 0.03 dB |
+| The app's `BLA_x` (`convert_with` + `official_excitation`, read from your own install) | ≤ 0.01 dB | ≤ 0.03 dB |
 | Ours (`excitation()`, the default) | 0.7–1.6 dB rms (max 2–7) | 1.0–1.3 dB rms (max 2–4) |
 
 **On hardware** (Dual Stomp Lite, V1.1.1): "Ampeg SVT – MD 421" (a `SlimmableContainer` bass model) converted by the
@@ -196,8 +196,15 @@ is larger.
 The difference with our excitation is the app's own measurement noise: where the DC transient and the signal
 interfere (roughly 100 Hz – 1 kHz), the result depends on the excitation's phases, so the app itself would give a
 different answer by this much with any other table. Averaging over phases (computable in closed form) was tried and
-is not closer to the app's single measurement. `BLA_x` can't be regenerated (it isn't `rand()`-derived) and is
-vendor data, so it isn't shipped.
+is not closer to the app's single measurement, and neither is the app's own spectrum with other phases (tested: error
+energy −0.2 to −31 dB vs the app's upload, the same spread as ours), so only the app's exact table reproduces its
+results. `BLA_x` can't be regenerated (it isn't `rand()`-derived) and is vendor data, so it isn't shipped:
+`nam::convert::official_excitation(path)` reads it from the user's own copy of Stomp Manager (the `.app` bundle,
+the Windows install folder or the library file; nothing is executed, the table is found by an 8-byte prefix and a
+64-bit hash), and `find_official_excitation()` tries the standard install locations. `Device::import_nam_file`
+uses it automatically when found, so with the app installed, imports match the official app exactly (verified
+on ten models: error energy −51 to −93 dB vs the app's uploads). It works on any OS with a downloaded copy of
+the app; the Windows build's table is assumed identical (not checked).
 
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 

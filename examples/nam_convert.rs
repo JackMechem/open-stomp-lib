@@ -3,6 +3,7 @@
 //!
 //! ```sh
 //! cargo run --release --example nam_convert -- model.nam [out.bin]
+//! cargo run --release --example nam_convert -- model.nam --official [app path] [out.bin]
 //! cargo run --release --example nam_convert -- model.nam --compare <harness dump dir>
 //! ```
 //!
@@ -58,11 +59,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = args.first().ok_or("usage: nam_convert <model.nam> [out.bin | --compare <dump dir>]")?;
     let mut model = Model::load(path)?;
     let t0 = std::time::Instant::now();
-    let ours = convert::convert(&mut model);
+    let mut rest: Vec<&str> = args[1..].iter().map(String::as_str).collect();
+    let official = if rest.first() == Some(&"--official") {
+        rest.remove(0);
+        let x = match rest.first().filter(|a| !a.ends_with(".bin") && std::path::Path::new(a).exists()) {
+            Some(p) => { let x = convert::official_excitation(p)?; rest.remove(0); x }
+            None => convert::find_official_excitation().ok_or("Stomp Manager not found; pass its path after --official")?,
+        };
+        println!("using the official app's excitation");
+        Some(x)
+    } else {
+        None
+    };
+    let ours = match &official {
+        Some(x) => convert::convert_with(&mut model, x),
+        None => convert::convert(&mut model),
+    };
     println!("{}: converted in {:.2?}", model.name.as_deref().unwrap_or(path), t0.elapsed());
-    match args.get(1).map(String::as_str) {
+    match rest.first().copied() {
         Some("--compare") => {
-            let dir = std::path::Path::new(args.get(2).ok_or("--compare needs a dump dir")?);
+            let dir = std::path::Path::new(*rest.get(1).ok_or("--compare needs a dump dir")?);
             let theirs: Vec<f32> = [read_f32(&dir.join("cb_g1.bin"))?, read_f32(&dir.join("cb_g2.bin"))?].concat();
             let vendor_x = read_f32(&dir.join("BLA_x.bin"))?;
             compare("vendor excitation", &convert::convert_with(&mut model, &vendor_x).data, &theirs);

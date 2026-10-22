@@ -130,6 +130,19 @@ fn convert(py: Python<'_>, model: &Bound<'_, PyAny>, excitation: Option<Vec<f32>
     Ok(c.into())
 }
 
+/// The official app's BLA excitation, read from an installed Stomp Manager (`path`: the app bundle,
+/// install folder or library file; `None` searches the standard install locations). With it,
+/// `convert(model, excitation=...)` matches the official app's conversion exactly.
+#[pyfunction]
+#[pyo3(signature = (path = None))]
+fn official_excitation(path: Option<std::path::PathBuf>) -> PyResult<Vec<f32>> {
+    match path {
+        Some(p) => n::convert::official_excitation(p).map_err(err),
+        None => n::convert::find_official_excitation()
+            .ok_or_else(|| PyValueError::new_err("Stomp Manager not found in the standard install locations")),
+    }
+}
+
 /// Our BLA excitation (8192 samples, pink multisine at about -90 dBFS).
 #[pyfunction]
 fn excitation() -> Vec<f32> {
@@ -141,6 +154,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Converted>()?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(excitation, m)?)?;
+    m.add_function(wrap_pyfunction!(official_excitation, m)?)?;
     m.add("TONE_BINS", n::convert::TONE_BINS.to_vec())?;
     m.add("FFT_SIZE", n::convert::N)?;
     Ok(())
