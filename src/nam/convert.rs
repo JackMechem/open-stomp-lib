@@ -63,7 +63,8 @@ pub struct Converted {
     pub bla_db: Vec<f64>,
     /// G1 target gain per tone, in dB.
     pub g1_gains_db: Vec<f64>,
-    /// The 8192-tap minimum-phase responses before truncation.
+    /// The 8192-tap minimum-phase responses before truncation (for [`Measure::Optimised`], the
+    /// fitted [`PEDAL_TAPS`]-tap responses as uploaded).
     pub g1_ir: Vec<f64>,
     pub g2_ir: Vec<f64>,
 }
@@ -331,6 +332,10 @@ pub enum Measure {
     /// the model's actual small-signal response at every frequency. Departs from the app on purpose,
     /// and uploads only the taps the pedal runs ([`upload_data`]).
     Clean,
+    /// [`Clean`](Measure::Clean), then G1/G2 fitted with a simulation of the pedal until it
+    /// sounds like the model ([`super::optimise`]). About a minute per model (optimised build).
+    /// Closer to the model than the app's conversion; see docs/05.
+    Optimised,
 }
 
 /// Convert a model with our excitation (see [`excitation`]), the app's way. Differs from the
@@ -351,6 +356,12 @@ pub fn convert_with(model: &mut Model, bla_x: &[f32]) -> Converted {
 
 /// Convert with a given excitation and measurement mode. Resets the model first.
 pub fn convert_measured(model: &mut Model, bla_x: &[f32], measure: Measure) -> Converted {
+    if measure == Measure::Optimised {
+        let mut c = convert_measured(model, bla_x, Measure::Clean);
+        let o = super::optimise::optimise(model, &c.data, &super::optimise::Options::default());
+        (c.data, c.g1_ir, c.g2_ir) = (o.data, o.g1_ir, o.g2_ir);
+        return c;
+    }
     assert_eq!(bla_x.len(), N, "the excitation is {N} samples");
     let fft = Fft::new();
     let clean_h = (measure == Measure::Clean).then(|| {
@@ -411,7 +422,7 @@ pub fn convert_measured(model: &mut Model, bla_x: &[f32], measure: Measure) -> C
     let data = match measure {
         // the app's layout, byte for byte (the pedal ignores the first 512 floats of each block)
         Measure::App => g1_ir[..1024].iter().rev().chain(g2_ir[..1024].iter().rev()).map(|&v| v as f32).collect(),
-        Measure::Clean => upload_data(&g1_ir, &g2_ir),
+        Measure::Clean | Measure::Optimised => upload_data(&g1_ir, &g2_ir),
     };
     Converted { data, factor: 1.0, levels, levels3, bla_db: h_db, g1_gains_db, g1_ir, g2_ir }
 }

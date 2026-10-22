@@ -1,7 +1,7 @@
 //! The NAM → pedal converter (docs/05).
 #![cfg(feature = "nam")]
 
-use open_stomp::nam::{Model, convert};
+use open_stomp::nam::{Model, convert, optimise};
 
 const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/data/nam/");
 
@@ -44,6 +44,24 @@ fn converter_properties() {
     assert!(clean.data[..512].iter().chain(&clean.data[1024..1536]).all(|&v| v == 0.0));
     let (h1, h2) = convert::pedal_irs(&clean.data);
     assert!((h1[0] - clean.g1_ir[0]).abs() < 1e-6 && (h2[511] - clean.g2_ir[511]).abs() < 1e-6);
+}
+
+#[test]
+#[cfg_attr(debug_assertions, ignore = "about a minute in a debug build; run with --release")]
+fn optimiser_improves_on_the_clean_conversion() {
+    let mut m = Model::load(format!("{DIR}wavenet.nam")).unwrap();
+    let clean = convert::convert_measured(&mut m, &convert::excitation(), convert::Measure::Clean);
+    let options = optimise::Options { steps: 4, ..Default::default() };
+    let o = optimise::optimise(&mut m, &clean.data, &options);
+    assert_eq!((o.data.len(), o.g1_ir.len(), o.g1_curve.len()), (2048, convert::PEDAL_TAPS, optimise::CURVE_POINTS));
+    assert!(o.data.iter().all(|v| v.is_finite()) && o.data[..512].iter().all(|&v| v == 0.0));
+    assert_eq!(o.data, convert::upload_data(&o.g1_ir, &o.g2_ir));
+    let best = o.loss.iter().copied().fold(f64::INFINITY, f64::min);
+    assert!(best < o.initial_loss, "{} -> {best}", o.initial_loss);
+    // the simulated pedal output for the result
+    let x = optimise::test_signal().x[..48000].to_vec();
+    let y = optimise::simulate(&o.data, &x);
+    assert!(y.len() == x.len() && y.iter().all(|v| v.is_finite()));
 }
 
 /// Against the official app, when harness dumps are available locally (they contain vendor and

@@ -267,6 +267,20 @@ let c = convert::convert_with(&mut model, &x);                          // = the
 
 This is opt-in; `dev.import_nam_file` never reads the official app.
 
+**Optimised conversion** (experimental, about a minute per model): instead of copying the app's algorithm, fit the
+two filters with a simulation of the pedal until it sounds like the model ([05](05-uploads-nam-ir.md#optimised-conversion)).
+
+```rust
+use open_stomp::nam::convert::Measure;
+
+dev.import_nam_file_with(2, "Jcm800.nam", Measure::Optimised)?;
+// or: convert::convert_measured(&mut model, &convert::excitation(), Measure::Optimised)
+// or, with your own starting point and settings: nam::optimise::optimise(&mut model, &init_data, &options)
+```
+
+`nam::optimise::simulate(&data, &input)` predicts what the pedal outputs for any upload (mono, 48 kHz, in the
+re-amp rig's input units).
+
 ### Uploading a user AMP or IR
 
 ```rust

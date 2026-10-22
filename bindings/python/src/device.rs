@@ -345,13 +345,23 @@ impl Device {
     }
 
     /// Convert a `.nam` file and import it into user AMP `slot` (0–9), named after the file, with
-    /// open-stomp's own converter (never reads the official app).
+    /// open-stomp's own converter (never reads the official app). `measure` as for
+    /// `nam.convert`: `"app"` (default), `"clean"` or `"optimised"` (about a minute).
     /// Releases the GIL during the conversion (a few seconds). Returns the conversion.
-    fn import_nam_file(&self, py: Python<'_>, slot: u8, path: std::path::PathBuf) -> PyResult<crate::nam::Converted> {
+    #[pyo3(signature = (slot, path, measure = "app"))]
+    fn import_nam_file(
+        &self,
+        py: Python<'_>,
+        slot: u8,
+        path: std::path::PathBuf,
+        measure: &str,
+    ) -> PyResult<crate::nam::Converted> {
+        let measure = crate::nam::parse_measure(measure)?;
         // convert without holding the device lock (recv() in other threads keeps working)
         let converted = py.detach(|| -> Result<_, open_stomp::nam::NamError> {
             let mut model = open_stomp::nam::Model::load(&path)?;
-            Ok(open_stomp::nam::convert(&mut model))
+            let x = open_stomp::nam::convert::excitation();
+            Ok(open_stomp::nam::convert::convert_measured(&mut model, &x, measure))
         });
         let converted = converted.map_err(crate::nam::err)?;
         let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();

@@ -100,16 +100,13 @@ impl Converted {
 
 /// Convert a model (a `Model`, or a path to a `.nam` file) into the pedal's user AMP data.
 /// `excitation`: 8192 samples to use instead of ours (e.g. the official app's `BLA_x`).
-/// `measure`: `"app"` (the official algorithm, default) or `"clean"` (steady-state small-signal
-/// measurement, no DC-blocker transient). Releases the GIL; takes a few seconds.
+/// `measure`: `"app"` (the official algorithm, default), `"clean"` (steady-state small-signal
+/// measurement, no DC-blocker transient) or `"optimised"` (clean, then fitted with a simulation of
+/// the pedal; about a minute). Releases the GIL; takes a few seconds.
 #[pyfunction]
 #[pyo3(signature = (model, excitation = None, measure = "app"))]
 fn convert(py: Python<'_>, model: &Bound<'_, PyAny>, excitation: Option<Vec<f32>>, measure: &str) -> PyResult<Converted> {
-    let measure = match measure {
-        "app" => n::convert::Measure::App,
-        "clean" => n::convert::Measure::Clean,
-        other => return Err(PyValueError::new_err(format!("measure must be \"app\" or \"clean\", not {other:?}"))),
-    };
+    let measure = parse_measure(measure)?;
     let mut owned;
     let mut borrowed;
     let m: &mut n::Model = if let Ok(m) = model.cast::<Model>() {
@@ -128,6 +125,20 @@ fn convert(py: Python<'_>, model: &Bound<'_, PyAny>, excitation: Option<Vec<f32>
     let x = excitation.unwrap_or_else(n::convert::excitation);
     let c = py.detach(|| n::convert::convert_measured(m, &x, measure));
     Ok(c.into())
+}
+
+/// `"app"`, `"clean"` or `"optimised"` → [`n::convert::Measure`].
+pub fn parse_measure(measure: &str) -> PyResult<n::convert::Measure> {
+    Ok(match measure {
+        "app" => n::convert::Measure::App,
+        "clean" => n::convert::Measure::Clean,
+        "optimised" => n::convert::Measure::Optimised,
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "measure must be \"app\", \"clean\" or \"optimised\", not {other:?}"
+            )));
+        }
+    })
 }
 
 /// The official app's BLA excitation, read from an installed Stomp Manager (`path`: the app bundle,

@@ -256,12 +256,25 @@ impl Device {
         slot: u8,
         path: impl AsRef<std::path::Path>,
     ) -> Result<crate::nam::Converted, Box<dyn std::error::Error + Send + Sync>> {
+        self.import_nam_file_with(slot, path, crate::nam::convert::Measure::App)
+    }
+
+    /// [`Device::import_nam_file`] with a choice of conversion
+    /// ([`Measure`](crate::nam::convert::Measure)); `Measure::Optimised` takes about a minute.
+    #[cfg(feature = "nam")]
+    pub fn import_nam_file_with(
+        &self,
+        slot: u8,
+        path: impl AsRef<std::path::Path>,
+        measure: crate::nam::convert::Measure,
+    ) -> Result<crate::nam::Converted, Box<dyn std::error::Error + Send + Sync>> {
         let path = path.as_ref();
         if slot >= upload::USER_SLOTS {
             return Err(Box::new(UploadError::Slot(slot)));
         }
         let mut model = crate::nam::Model::load(path)?;
-        let converted = crate::nam::convert(&mut model);
+        let converted =
+            crate::nam::convert::convert_measured(&mut model, &crate::nam::convert::excitation(), measure);
         let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         self.import_user_amp(slot, &name, &converted.data, converted.factor)?;
         Ok(converted)

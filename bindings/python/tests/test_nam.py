@@ -37,6 +37,14 @@ def test_convert():
     assert len(nam.excitation()) == nam.FFT_SIZE
 
 
+def test_convert_measure():
+    clean = nam.convert(DATA / "wavenet.nam", measure="clean")
+    # only the taps the pedal runs
+    assert all(v == 0.0 for v in clean.data[:512] + clean.data[1024:1536])
+    with pytest.raises(ValueError):
+        nam.convert(DATA / "wavenet.nam", measure="exact")
+
+
 def test_errors():
     with pytest.raises(OSError):
         nam.Model.load("/no/such/model.nam")

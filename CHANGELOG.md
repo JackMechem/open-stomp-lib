@@ -24,6 +24,14 @@ All notable changes to `open-stomp`. The format follows
 - `nam::convert::PEDAL_TAPS`, `upload_data`, `pedal_irs`: the pedal runs only the first 512 taps
   of each uploaded filter (found by re-amping; docs/05). `Measure::Clean` now uploads exactly
   those taps, with the ignored halves zeroed; `Measure::App` keeps the app's layout.
+- `nam::optimise` and `Measure::Optimised` (experimental): fit G1/G2 so a simulation of the pedal
+  (`y = G2 ⊛ f(G1 ⊛ x)`, its saturation curve fitted from re-amp recordings) matches the model on
+  sweeps, tones and pink noise, starting from the clean conversion. Hand-written gradients, Adam,
+  no ML framework; about a minute per model. A PyTorch prototype of the same optimiser beat the
+  official conversion on hardware (Ampeg SVT bass model: 6.7–7.0 vs 9.0 dB rms error against the
+  real model); this port scores 6.3 in simulation (official 8.9). `Device::import_nam_file_with`,
+  `optimise::simulate`, example `nam_optimise`. Python: `measure="optimised"` in `nam.convert` and
+  `Device.import_nam_file`.
 - `nam::convert::official_excitation` / `find_official_excitation`: read the official app's test
   signal from the user's own Stomp Manager install (located by fingerprint; no vendor data in the
   source). With it the conversion equals the official one (error energy −51 to −93 dB on ten

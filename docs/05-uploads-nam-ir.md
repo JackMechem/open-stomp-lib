@@ -226,6 +226,45 @@ conversions match the official app exactly (verified on ten models: error energy
 uploads). It works on any OS with a downloaded copy of
 the app; the Windows build's table is assumed identical (not checked).
 
+### Optimised conversion
+
+The official algorithm designs G1 and G2 from two measurements of the model and never checks what the pedal does with
+them. `Measure::Optimised` (`nam::optimise`) simulates the pedal instead and adjusts the filters until the simulated
+output sounds like the model:
+
+* **Pedal model.** `y = G2 ⊛ f(G1 ⊛ x)` with 512-tap filters and a fixed piecewise-linear saturation `f` (knots at
+  0, ±¼ … ±32 in octaves, flat beyond; fitted jointly to re-amp recordings of three different uploads). It nulls
+  against the recordings to the rig's own repeatability (above).
+* **Target.** The model's output for the same signal: input −12 dB, the app's DC blocker, × 0.0932 (the pedal's
+  output level relative to the model's, measured on the re-amp rig).
+* **Test signal** (53 s at 48 kHz). Log sweeps 20 Hz – 20 kHz at −36/−24/−12/−6 dBFS, 1 s tones at 41.2, 55, 73.4,
+  98 and 196 Hz at −24/−12/−6 dBFS, and pink noise at about −36, −24 and −12 dBFS. A pink-noise segment at
+  −18 dBFS is simulated but not fitted.
+* **Filters.** Each is a smooth log-magnitude curve at 41 control points (20 Hz × 2^(i/4), linear in log-frequency)
+  made minimum-phase by the folded cepstrum (N = 8192) and cut to 512 taps.
+* **Fit.** Multi-resolution STFT log-magnitude L1 distance (windows 4096/1024/256, ¼ hop, 50 ms trimmed from each
+  segment end), plus `1e-3 · mean(max(|u| − 100, 0)²)` to keep `u = G1 ⊛ x` inside the range `f` was fitted on, plus
+  `1e-3 ·` the mean squared second difference of each curve. Adam, 300 steps, learning rate 0.05 with a 10-step
+  warm-up and cosine decay, starting from the `Measure::Clean` conversion; the best step is kept. Gradients are
+  written out by hand and checked against PyTorch's autograd (`tests/data/optim`) and finite differences. About a
+  minute per model (optimised build, 8 cores).
+
+Results on the Ampeg SVT "Gain 10 Ultra Lo and Hi MD 421" bass model, scored against the real model (rms dB error of
+1/3-octave sweep responses, tone fundamentals and 3rd/5th harmonic ratios):
+
+| Upload | Freq. response | Note level | Harmonics | Overall |
+|---|---|---|---|---|
+| Official app (recorded) | 7.96 | 9.64 | 11.72 | 8.96 |
+| `Measure::Clean` (recorded) | 6.51 | 7.69 | 16.14 | 9.26 |
+| PyTorch prototype of the optimiser, two runs (recorded) | 5.70–5.74 | 5.62 | 9.93–10.98 | 6.73–7.02 |
+| PyTorch prototype (simulated) | 5.93 | 5.83 | 9.30 | 6.70 |
+| `Measure::Optimised` (simulated) | 5.79 | 4.47 | 8.57 | 6.31 |
+
+The Rust port differs from the prototype only in leaving out the rig's dry-path EQ from the target (≤ 0.4 dB) and in
+its pink-noise generator. Still missing on hardware: the overall level is 3–5 dB low and the model's 60–100 Hz
+resonance is up to ~10 dB short. 512 taps (10.7 ms) can't resolve it fully, and the harmonics are limited by the
+pedal's fixed `f`.
+
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
 ```
