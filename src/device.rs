@@ -305,6 +305,23 @@ impl Device {
         Ok(())
     }
 
+    /// Convert an IR audio file ([`crate::ir::convert`]: WAV, any sample rate) and import it into
+    /// user IR `slot` (0–9), named after the file like the official app does (first 16
+    /// characters). Returns the conversion. The gain is provisional (docs/09).
+    pub fn import_ir_file(
+        &self,
+        slot: u8,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<crate::ir::ConvertedIr, Box<dyn std::error::Error + Send + Sync>> {
+        let path = path.as_ref();
+        if slot >= upload::USER_SLOTS {
+            return Err(Box::new(UploadError::Slot(slot)));
+        }
+        let converted = crate::ir::convert(&crate::ir::Wav::load(path)?);
+        self.import_user_ir(slot, &crate::ir::slot_name(path), &converted.data)?;
+        Ok(converted)
+    }
+
     /// Write the global settings (read-modify-write: start from the pedal's current record).
     pub fn write_settings(&self, settings: &Settings) {
         self.write(vec![host::settings_write(settings)]);

@@ -151,7 +151,7 @@ The analysis code is in [`tools/pedalsim`](tools/pedalsim); `readme_plots.py --c
 | System settings | ✅ (some bytes unknown) | ✅ decode + encode |
 | User AMP (NAM) / user IR upload transport | ✅ chunk protocol decoded | ✅ `upload`, byte-exact vs capture |
 | NAM inference and NAM → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `nam`, verified against the app; optimised conversion verified on hardware |
-| IR (audio) → device conversion | ❌ open | ❌ |
+| IR (audio) → device conversion | ✅ layout recovered, gain rule open ([docs/09](docs/09-open-questions.md)) | ✅ `ir`, `Device::import_ir_file` (provisional gain) |
 
 Live CCs are verified on hardware. Preset and settings **writes** match the official app byte for byte but have not
 yet been run on hardware from this code. Back up your presets first.

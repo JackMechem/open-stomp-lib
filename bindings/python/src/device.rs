@@ -387,6 +387,17 @@ impl Device {
         d.import_user_ir(slot, name, &data).map_err(crate::upload::err)
     }
 
+    /// Convert an IR WAV file and import it into user IR `slot` (0–9), named after the file
+    /// (first 16 characters) like the official app. Returns the conversion.
+    fn import_ir_file(&self, slot: u8, path: std::path::PathBuf) -> PyResult<crate::ir::ConvertedIr> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.import_ir_file(slot, &path).map(Into::into).map_err(|e| match e.downcast::<open_stomp::upload::UploadError>() {
+            Ok(u) => crate::upload::err(*u),
+            Err(e) => crate::ir::err(e),
+        })
+    }
+
     /// Write the global settings (start from `DeviceState.settings` so unknown bytes survive).
     fn write_settings(&self, settings: PyRef<'_, Settings>) -> PyResult<()> {
         self.with(|d| d.write_settings(&settings.0))

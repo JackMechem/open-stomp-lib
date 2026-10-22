@@ -2,6 +2,7 @@ from . import capture as capture
 from . import catalog as catalog
 from . import device as device
 from . import midi as midi
+from . import ir as ir
 from . import nam as nam
 from . import pack as pack
 from . import queue as queue

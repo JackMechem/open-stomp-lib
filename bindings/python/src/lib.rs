@@ -5,6 +5,7 @@
 
 mod catalog;
 mod device;
+mod ir;
 mod midi;
 mod nam;
 mod queue;
@@ -46,6 +47,7 @@ fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     submodule(m, "capture", queue::register_capture)?;
     submodule(m, "upload", upload::register)?;
     submodule(m, "nam", nam::register)?;
+    submodule(m, "ir", ir::register)?;
     submodule(m, "device", device::register)?;
     Ok(())
 }

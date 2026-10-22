@@ -284,11 +284,21 @@ let c = convert::convert_measured(&mut model, &convert::excitation(), Measure::O
 `nam::optimise::simulate(&data, &input)` predicts what the pedal outputs for any upload (mono, 48 kHz, in the
 re-amp rig's input units).
 
+### Importing an IR
+
+```rust
+dev.import_ir_file(0, "My Cab.wav")?;             // convert + upload to USER IR 01, named "My Cab"
+```
+
+Or step by step: `ir::Wav::load(path)?`, `ir::convert(&wav)` (first channel, resampled to 48 kHz, the first 2048
+samples reversed and scaled), then `dev.import_user_ir(slot, name, &c.data)`. This follows the official app's
+conversion, except that the app's gain rule isn't known yet, so the level may differ by a dB or so
+([09](09-open-questions.md)). `ir::resample` and `Wav::to_bytes` are there for your own processing.
+
 ### Uploading a user AMP or IR
 
 ```rust
-// data: 2048 converted floats (from nam::convert, or a captured conversion).
-// Converting audio files into IR data is not implemented yet (docs/05).
+// data: 2048 converted floats (from nam::convert / ir::convert, or a captured conversion).
 dev.import_user_amp(2, "Jcm800", &data, 1.0)?;   // USER AMP 03: select model 32, slot info, 61 chunks
 dev.import_user_ir(0, "My Cab", &data)?;         // USER IR 01: CAB page, model 30, 61 chunks, name
 dev.delete_user_amp(2)?;

@@ -197,6 +197,19 @@ The optimised conversion (the default for `import_nam_file`) fits the filters wi
 
 `Converted` also has every intermediate stage (`levels`, `levels3`, `bla_db`, `g1_gains_db`, `g1_ir`, `g2_ir`).
 
+### Importing an IR
+
+```python
+dev.import_ir_file(0, "My Cab.wav")           # convert + upload to USER IR 01, named "My Cab"
+
+from open_stomp import ir
+c = ir.convert("My Cab.wav")                  # c.data: the 2048 floats; c.gain, c.ir
+rate, channels = ir.load_wav("My Cab.wav")    # also ir.save_wav, ir.resample
+```
+
+The conversion follows the official app's, except that the app's gain rule isn't known yet, so the level may differ
+by a dB or so ([09](09-open-questions.md)).
+
 ### Uploading a user AMP or IR
 
 ```python
@@ -205,7 +218,7 @@ dev.import_user_ir(0, "My Cab", floats)       # USER IR 01
 dev.delete_user_amp(2)
 ```
 
-Converting `.nam`/`.wav` files into the 2048 floats isn't implemented yet ([05](05-uploads-nam-ir.md)); a captured
+`nam.convert` and `ir.convert` make the 2048 floats from `.nam` and `.wav` files; a captured
 conversion can be recovered with `upload.Chunk.parse` + `upload.Reassembler` and uploaded to any slot. A bad slot or
 data raises `ValueError`.
 
