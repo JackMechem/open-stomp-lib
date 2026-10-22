@@ -17,6 +17,7 @@
 
 mod activation;
 pub mod convert;
+pub mod optimise;
 mod wavenet;
 
 use std::path::Path;
