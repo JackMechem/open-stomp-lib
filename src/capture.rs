@@ -158,6 +158,76 @@ mod tests {
         assert_eq!(ours, theirs);
     }
 
+    /// Every captured NAM and IR import is rebuilt byte for byte from its decoded parts (slot,
+    /// name, factor, floats), and the imported names reach the state.
+    #[test]
+    fn uploads_match_capture() {
+        use crate::midi::{Cmd, Msg};
+        use crate::upload::{self, Chunk, Reassembler, UserAmpInfo, amp_sub};
+
+        let host: Vec<Vec<u8>> = main_session()
+            .into_iter()
+            .filter_map(|e| match e {
+                Entry::Message { origin: Origin::Host, bytes, .. } => Some(bytes),
+                _ => None,
+            })
+            .collect();
+        let nep = |b: &[u8]| match Msg::parse(b) {
+            Msg::Nep { cmd, dir: 1, payload } => Some((cmd, payload)),
+            _ => None,
+        };
+        // the data chunks from `from` on, until one upload is complete: (index of its last chunk, slot, floats)
+        let collect = |from: usize| -> (usize, u8, Vec<f32>) {
+            let mut r = Reassembler::default();
+            for (k, b) in host.iter().enumerate().skip(from) {
+                let (_, p) = nep(b).expect("data chunk");
+                if let Some((slot, floats)) = r.push(&Chunk::parse(&p).unwrap()) {
+                    return (k, slot, floats);
+                }
+            }
+            panic!("incomplete upload");
+        };
+        let (mut amps, mut irs) = (0, 0);
+        let mut i = 0;
+        while i < host.len() {
+            let Some((cmd, payload)) = nep(&host[i]) else {
+                i += 1;
+                continue;
+            };
+            let chunk = Chunk::parse(&payload);
+            if cmd == Cmd::UserAmp as u8 && let Some(info) = UserAmpInfo::parse(&payload) {
+                // NAM import: slot-info record, then the data
+                let (end, slot, floats) = collect(i + 1);
+                assert_eq!((slot, floats.len(), info.factor), (info.slot, upload::UPLOAD_FLOATS, 1.0));
+                let ours = upload::user_amp_upload(&UserAmpInfo::new(info.slot, &info.name, info.factor), &floats);
+                assert_eq!(ours, host[i..=end], "NAM import {:?}", info.name);
+                amps += 1;
+                i = end;
+            } else if cmd == Cmd::IrData as u8 && chunk.as_ref().is_some_and(|c| c.offset == 0) {
+                // IR import: the data, then the 0x09 name write
+                let (end, slot, floats) = collect(i);
+                let name = crate::records::parse_ir_slot(&nep(&host[end + 1]).unwrap().1).unwrap().1;
+                assert_eq!(upload::user_ir_upload(slot, &name, &floats), host[i..=end + 1], "IR import {name:?}");
+                irs += 1;
+                i = end + 1;
+            } else if cmd == Cmd::UserAmp as u8 && let Some(c) = chunk.filter(|c| c.sub == amp_sub::DELETE) {
+                assert_eq!(upload::user_amp_delete(c.slot), host[i]);
+            }
+            i += 1;
+        }
+        assert_eq!((amps, irs), (3, 1), "FNDR twice + Jcm800, one IR");
+
+        let mut st = DeviceState::default();
+        for e in main_session() {
+            if let Entry::Message { origin, bytes, .. } = e {
+                st.apply(&bytes, origin);
+            }
+        }
+        assert_eq!(st.user_amps[0].as_deref(), Some("FNDR BFSR VB Edge WRM2 CAB FREE"));
+        assert_eq!(st.user_amps[2].as_deref(), Some("Jcm800"));
+        assert_eq!(st.user_irs[0].as_deref(), Some("Delay And Reverb"));
+    }
+
     #[test]
     fn preset_switch_applies_cached_preset() {
         let mut st = DeviceState::default();

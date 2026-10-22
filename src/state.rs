@@ -3,7 +3,7 @@
 
 use crate::catalog::{Module, NOTES, drum_pattern_name};
 use crate::midi::{Cmd, Dir, HOST_CH, Msg, hex};
-use crate::records::{PRESET_COUNT, Preset, Settings, parse_ir_slot, parse_user_amp, u14};
+use crate::records::{PRESET_COUNT, Preset, Settings, parse_ir_slot, u14};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Origin {
@@ -165,6 +165,14 @@ impl Default for DeviceState {
 
 fn key(parts: &[u64]) -> Option<u64> {
     Some(parts.iter().fold(0xcbf29ce484222325u64, |h, p| (h ^ p).wrapping_mul(0x100000001b3)))
+}
+
+/// `"4352 / 8192 bytes"` for an upload chunk.
+fn upload_progress(payload: &[u8]) -> String {
+    match crate::upload::Chunk::parse(payload) {
+        Some(c) => format!("{} / {} bytes", c.offset as usize + c.data.len(), c.total),
+        None => format!("{} bytes", payload.len()),
+    }
 }
 
 pub fn preset_label(i: u8) -> String {
@@ -536,17 +544,31 @@ impl DeviceState {
                     }
                 }
             }
-            Some(Cmd::UserAmp) if dir == Dir::Reply as u8 => {
-                if let Some((slot, name)) = parse_user_amp(payload) {
-                    ev.value = format!("USER AMP {:02} · {name}", slot + 1);
-                    if let Some(s) = self.user_amps.get_mut(slot as usize) {
-                        *s = Some(name);
+            Some(Cmd::UserAmp) if dir == Dir::Reply as u8 || host_write => {
+                use crate::upload::{Chunk, UserAmpInfo, amp_sub};
+                let chunk = Chunk::parse(payload);
+                if let Some(info) = UserAmpInfo::parse(payload) {
+                    ev.value = format!("USER AMP {:02} · {}", info.slot + 1, info.name);
+                    if host_write {
+                        ev.category = Category::Effect(Module::Amp);
+                        ev.subject = "User AMP import".into();
                     }
+                    if let Some(s) = self.user_amps.get_mut(info.slot as usize) {
+                        *s = Some(info.name);
+                    }
+                } else if let Some(c) = chunk.filter(|c| c.sub == amp_sub::DELETE) {
+                    ev.category = Category::Effect(Module::Amp);
+                    ev.subject = "User AMP deleted".into();
+                    ev.value = format!("USER AMP {:02}", c.slot + 1);
+                } else if host_write {
+                    ev.subject = format!("{} upload", Cmd::label(cmd));
+                    ev.value = upload_progress(payload);
+                    ev.coalesce = key(&[ev.origin as u64, 11, cmd as u64]);
                 }
             }
-            Some(Cmd::UserAmp) | Some(Cmd::IrData) if host_write => {
+            Some(Cmd::IrData) if host_write => {
                 ev.subject = format!("{} upload", Cmd::label(cmd));
-                ev.value = format!("{} bytes", payload.len());
+                ev.value = upload_progress(payload);
                 ev.coalesce = key(&[ev.origin as u64, 11, cmd as u64]);
             }
             Some(Cmd::Loop) if data => {

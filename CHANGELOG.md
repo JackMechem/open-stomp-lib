@@ -6,6 +6,57 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-21
+
+### Added
+- `nam` feature and module (on by default): load and run Neural Amp Modeler `.nam` models (a
+  pure-Rust port of NeuralAmpModelerCore's WaveNet, plain and `SlimmableContainer`; matches it to
+  ≤ 3e-5 on its example models, which are now test vectors), and `nam::convert`, the official
+  app's NAM → pedal converter: a fundamental/3rd-harmonic tone test and a small-signal linear
+  response give two minimum-phase FIRs. With the app's own excitation the result matches its
+  upload to ≤ 0.03 dB; with ours (the default) within ~1–1.5 dB rms, the app's own measurement
+  noise. `Device::import_nam_file(slot, path)` converts and uploads. Examples `nam_convert`,
+  `nam_render`, `nam_check`. Python: `open_stomp.nam`, `Device.import_nam_file`. Confirmed on
+  hardware: an official and an open conversion of the same bass model sound identical.
+- `nam::convert::Measure::Clean` (`convert_measured`; Python `nam.convert(..., measure="clean")`),
+  experimental: the same converter with a steady-state small-signal measurement instead of the
+  app's transient-affected one. Re-amp tests on hardware against the real model (Ampeg SVT bass
+  model): closer mid scoop, top-end roll-off and upper-note distortion than the official
+  algorithm, but still short on the 63–90 Hz resonance and about 5 dB quieter. Not the default.
+- `nam::convert::PEDAL_TAPS`, `upload_data`, `pedal_irs`: the pedal runs only the first 512 taps
+  of each uploaded filter (found by re-amping; docs/05). `Measure::Clean` now uploads exactly
+  those taps, with the ignored halves zeroed; `Measure::App` keeps the app's layout.
+- `nam::optimise` and `Measure::Optimised`, the default for `Device::import_nam_file` (about a
+  minute per model): fit G1/G2 so a simulation of the pedal (`y = G2 ⊛ f(G1 ⊛ x)`, its saturation
+  curve fitted from re-amp recordings) matches the model on sweeps, tones and pink noise, starting
+  from the clean conversion. Hand-written gradients, Adam, no ML framework. On hardware (Ampeg SVT
+  bass model) it scores 6.72–6.85 dB rms error against the real model, against 9.32 for the
+  official conversion in the same session. `Device::import_nam_file_with(.., Measure::App)` keeps
+  the official algorithm (a few seconds). Progress and cancel: `convert::convert_optimised`,
+  `optimise::optimise_with_progress`. Also `optimise::simulate`, example `nam_optimise`.
+  Python: `Device.import_nam_file(..., measure="optimised")` (default) and `nam.convert(...,
+  measure="optimised")`.
+- `nam::convert::official_excitation` / `find_official_excitation`: read the official app's test
+  signal from the user's own Stomp Manager install (located by fingerprint; no vendor data in the
+  source). With it the conversion equals the official one (error energy −51 to −93 dB on ten
+  models). Strictly opt-in: `Device::import_nam_file` and everything else never read the app.
+  Python: `nam.official_excitation()`.
+- `upload` module: user AMP (NAM, SysEx `0x58`) and user IR (`0x10` + `0x09`) upload framing:
+  chunking, the 128-byte slot-info record (`UserAmpInfo`: name, factor), delete, and a
+  `Reassembler` that turns captured chunks back into floats. Every captured import rebuilds
+  byte for byte. `Device::import_user_amp` / `delete_user_amp` / `import_user_ir` send the
+  official app's sequences (2048 finite floats, slots 0–9, else `UploadError`). Also in the
+  Python bindings (`open_stomp.upload`, `Device.import_user_amp` …).
+- `DeviceState` follows user AMP imports and deletes (slot names, log events with progress).
+
+### Changed
+- docs/05: corrected chunk header (plain byte offset + total length, not 8-byte units), the
+  slot-info record layout, and the app selecting the slot's model *before* uploading.
+- docs/05, docs/09: the NAM converter algorithm, recovered from the vendor code and verified stage
+  by stage: a small-signal best linear approximation and a sine tone test (fundamental and 3rd
+  harmonic) through the network give two minimum-phase FIRs (Wiener–Hammerstein G1/G2) whose first
+  1024 taps, reversed, are the upload; `factor` is always 1.0.
+
 ## [0.2.0] - 2026-10-21
 
 ### Added
@@ -43,6 +94,7 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JackMechem/open-stomp-lib/releases/tag/v0.1.0

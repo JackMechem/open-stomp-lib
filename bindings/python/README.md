@@ -17,6 +17,7 @@ with Device() as dev:                 # finds and connects to the pedal by itsel
             dev.set_param(Module.AMP, 0, 100)   # turn the active preset's gain up
 ```
 
+* Import NAM amp models: `dev.import_nam_file(slot, "amp.nam")`, or `open_stomp.nam` to run and convert models.
 * Python ≥ 3.9 (one `abi3` wheel per platform), Linux / macOS / Windows.
 * Fully typed (`py.typed` stubs, checked against the compiled module with `stubtest`).
 * Blocking calls release the GIL, and Ctrl-C interrupts them.

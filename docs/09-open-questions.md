@@ -4,10 +4,10 @@ Ordered by usefulness for a Linux editor. Each item says how to resolve it.
 
 ## High value
 
-1. **NAM → device conversion** (`imagelib`). 2048 floats = probably two 1024-float arrays (g1 transfer curve /
-   g2 reversed IR) + a "factor" scalar in the slot-info record. Resolve by reversing
-   `imagelib.framework` (`ImageUtility::loadNamFile`/`namModel`/`namBuffer`), validated against
-   `captures/files/*.device_floats.bin`. See [05](05-uploads-nam-ir.md).
+1. ~~**NAM → device conversion**~~: solved and implemented (`open_stomp::nam`, [05](05-uploads-nam-ir.md#our-implementation)).
+   Confirmed on hardware (2026-10-21, firmware V1.1.1): an Ampeg SVT model converted by the official algorithm and by
+   ours, both uploaded by `open_stomp`, sound identical on the pedal. Left: LSTM/ConvNet NAM models (the app's NAM
+   core supports ConvNet too).
 2. **IR transform.** Capture an upload of a short plain cab IR (< 2048 samples) and compare sample by sample. Also
    record which file was used for the existing capture (the two Tone Charm WAVs are candidates).
 3. **IR slot 4-byte field** (`0x09` record bytes 0–3): a CRC or a flag? It was `01 00 00 00` after an upload.

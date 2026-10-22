@@ -334,6 +334,59 @@ impl Device {
         self.with(|d| d.save_preset(source_slot, &preset.0))
     }
 
+    /// Import converted NAM data (2048 floats) into user AMP `slot` (0–9) like the official app:
+    /// select the slot's amp model, write the slot-info record, then the data. Raises
+    /// `ValueError` for a bad slot or data.
+    #[pyo3(signature = (slot, name, data, factor = 1.0))]
+    fn import_user_amp(&self, slot: u8, name: &str, data: Vec<f32>, factor: f32) -> PyResult<()> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.import_user_amp(slot, name, &data, factor).map_err(crate::upload::err)
+    }
+
+    /// Convert a `.nam` file and import it into user AMP `slot` (0–9), named after the file, with
+    /// open-stomp's own converter (never reads the official app). `measure`: `"optimised"` (the
+    /// default and the closest to the model, about a minute), `"app"` (the official algorithm, a
+    /// few seconds) or `"clean"`. Releases the GIL during the conversion. Returns the conversion.
+    #[pyo3(signature = (slot, path, measure = "optimised"))]
+    fn import_nam_file(
+        &self,
+        py: Python<'_>,
+        slot: u8,
+        path: std::path::PathBuf,
+        measure: &str,
+    ) -> PyResult<crate::nam::Converted> {
+        let measure = crate::nam::parse_measure(measure)?;
+        // convert without holding the device lock (recv() in other threads keeps working)
+        let converted = py.detach(|| -> Result<_, open_stomp::nam::NamError> {
+            let mut model = open_stomp::nam::Model::load(&path)?;
+            let x = open_stomp::nam::convert::excitation();
+            Ok(open_stomp::nam::convert::convert_measured(&mut model, &x, measure))
+        });
+        let converted = converted.map_err(crate::nam::err)?;
+        let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        {
+            let g = self.lock();
+            let d = g.as_ref().ok_or_else(closed)?;
+            d.import_user_amp(slot, &name, &converted.data, converted.factor).map_err(crate::upload::err)?;
+        }
+        Ok(converted.into())
+    }
+
+    /// Delete user AMP `slot` and re-read its info.
+    fn delete_user_amp(&self, slot: u8) -> PyResult<()> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.delete_user_amp(slot).map_err(crate::upload::err)
+    }
+
+    /// Import IR data (2048 floats) into user IR `slot` (0–9) like the official app.
+    fn import_user_ir(&self, slot: u8, name: &str, data: Vec<f32>) -> PyResult<()> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.import_user_ir(slot, name, &data).map_err(crate::upload::err)
+    }
+
     /// Write the global settings (start from `DeviceState.settings` so unknown bytes survive).
     fn write_settings(&self, settings: PyRef<'_, Settings>) -> PyResult<()> {
         self.with(|d| d.write_settings(&settings.0))

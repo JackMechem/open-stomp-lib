@@ -2,10 +2,12 @@
 
 import os
 from types import TracebackType
+from collections.abc import Sequence
 from typing import Literal, Optional, Union, final
 
 from ._types import BytesLike
 from .catalog import Module
+from .nam import Converted
 from .records import Preset, Settings
 from .state import Origin
 
@@ -81,4 +83,13 @@ class Device:
     def show_page(self, module: Module) -> None: ...
     def looper_button(self, button: int) -> None: ...
     def save_preset(self, source_slot: int, preset: Preset) -> None: ...
+    def import_user_amp(self, slot: int, name: str, data: Sequence[float], factor: float = 1.0) -> None: ...
+    def import_nam_file(
+        self,
+        slot: int,
+        path: Union[str, os.PathLike[str]],
+        measure: Literal["app", "clean", "optimised"] = "optimised",
+    ) -> Converted: ...
+    def delete_user_amp(self, slot: int) -> None: ...
+    def import_user_ir(self, slot: int, name: str, data: Sequence[float]) -> None: ...
     def write_settings(self, settings: Settings) -> None: ...

@@ -26,7 +26,7 @@ the pedal, your program can do with the calls below. From Python, see [11](11-py
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.2.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.3.0" }
 # or, with a local checkout next to your project:
 open-stomp = { path = "../open-stomp-lib" }
 # protocol only (no MIDI I/O, no dependencies):
@@ -36,6 +36,7 @@ open-stomp = { path = "../open-stomp-lib", default-features = false }
 | Feature | Default | What it adds |
 |---|---|---|
 | `device` | on | `open_stomp::device`: the engine thread (midir: ALSA on Linux, CoreMIDI on macOS, WinMM on Windows) |
+| `nam` | on | `open_stomp::nam`: run `.nam` models and convert them for the pedal (`serde_json`, `rustfft`) |
 
 Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers (`libasound2-dev` / `alsa-lib-devel`); macOS and
 Windows need nothing extra. The pedal is class compliant, so no driver is needed anywhere.
@@ -50,7 +51,9 @@ Windows need nothing extra. The pedal is class compliant, so no driver is needed
 | [`records`](../src/records.rs) | none | `Preset` (110 B), `Settings` (17 B), user slot names, ASCII helpers | [04](04-data-structures.md) |
 | [`state`](../src/state.rs) | none | `DeviceState`: applies every message, returns a readable `Event` | all |
 | [`queue`](../src/queue.rs) | none | `RequestQueue`: one SysEx in flight, reply matching, timeouts, sync progress; `handshake()` | [03](03-sysex-protocol.md) |
+| [`upload`](../src/upload.rs) | none | User AMP (NAM) / user IR upload framing: chunks, slot-info record, reassembly | [05](05-uploads-nam-ir.md) |
 | [`capture`](../src/capture.rs) | none | Capture log reader | [07](07-capture-methodology.md) |
+| [`nam`](../src/nam/mod.rs) | files | `.nam` model loading and inference (NeuralAmpModelerCore port), the NAM → pedal converter | [05](05-uploads-nam-ir.md) |
 | [`device`](../src/device.rs) | MIDI | `Device`: hotplug scan, auto-connect, startup sync, edits, replay | this doc |
 
 The crate root re-exports the everyday types: `Module`, `Msg`, `Assembler`, `Preset`, `Settings`, `DeviceState`,
@@ -235,6 +238,65 @@ dev.save_preset(source, &p);
 This queues the official app's exact sequence ([03](03-sysex-protocol.md)): `0x12` name write (first byte = the
 source slot), `0x0B` preset write (waits for its ack), then a program change to the saved slot. It is tested byte for
 byte against the captured *save as*.
+
+### Importing a NAM model
+
+```rust
+dev.import_nam_file(2, "Jcm800.nam")?;            // optimised conversion (~1 min, optimised build) + upload to USER AMP 03
+```
+
+This uses the optimised conversion (below), the closest to the model on hardware. For the official app's algorithm
+(a few seconds), use `dev.import_nam_file_with(2, "Jcm800.nam", Measure::App)`.
+
+Or step by step, e.g. to inspect or cache the result:
+
+```rust
+use open_stomp::nam::{Model, convert};
+
+let mut model = Model::load("Jcm800.nam")?;
+let c = convert(&mut model);                     // c.data: the 2048 floats, c.factor: 1.0
+dev.import_user_amp(2, "Jcm800", &c.data, c.factor)?;
+```
+
+`Model` also runs the network on your own audio (`model.process(&input, &mut output)`, mono, 48 kHz). `convert`
+reproduces the official app's algorithm; with our own test signal the resulting filters are within ~1–1.5 dB rms of
+the app's (the app's own measurement noise, see [05](05-uploads-nam-ir.md#our-implementation)).
+For an exact match with the official app, use its own test signal from an installed Stomp Manager:
+
+```rust
+let x = convert::official_excitation("/Applications/Stomp Manager.app")?; // or find_official_excitation()
+let c = convert::convert_with(&mut model, &x);                          // = the official conversion
+```
+
+This is opt-in; `dev.import_nam_file` never reads the official app.
+
+**Optimised conversion** (the default for `import_nam_file`, about a minute per model): instead of copying the app's
+algorithm, fit the two filters with a simulation of the pedal until it sounds like the model
+([05](05-uploads-nam-ir.md#optimised-conversion)).
+
+```rust
+use open_stomp::nam::convert::Measure;
+
+let c = convert::convert_measured(&mut model, &convert::excitation(), Measure::Optimised);
+// or, with your own starting point and settings: nam::optimise::optimise(&mut model, &init_data, &options)
+```
+
+`nam::optimise::simulate(&data, &input)` predicts what the pedal outputs for any upload (mono, 48 kHz, in the
+re-amp rig's input units).
+
+### Uploading a user AMP or IR
+
+```rust
+// data: 2048 converted floats (from nam::convert, or a captured conversion).
+// Converting audio files into IR data is not implemented yet (docs/05).
+dev.import_user_amp(2, "Jcm800", &data, 1.0)?;   // USER AMP 03: select model 32, slot info, 61 chunks
+dev.import_user_ir(0, "My Cab", &data)?;         // USER IR 01: CAB page, model 30, 61 chunks, name
+dev.delete_user_amp(2)?;
+```
+
+These send the official app's sequences, tested byte for byte against every captured import. They return an
+`UploadError` for a slot outside 0–9 or data that isn't 2048 finite floats. `upload::Reassembler` turns captured
+chunks back into floats.
 
 ### Changing system settings
 

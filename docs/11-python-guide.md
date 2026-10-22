@@ -43,6 +43,8 @@ The package mirrors the Rust crate. The most used types are also importable from
 | `open_stomp.state` | `DeviceState`, `Event`, `Origin`, `Looper`, `Drum`, `Tuner`, `looper_state_name` | `state` |
 | `open_stomp.queue` | `RequestQueue`, `Request`, `Done`, `handshake`, `follow_up` | `queue` |
 | `open_stomp.capture` | `parse`, `Entry` | `capture` |
+| `open_stomp.nam` | `Model`, `Converted`, `convert`, `excitation`, `TONE_BINS`, `FFT_SIZE` | `nam` |
+| `open_stomp.upload` | `Chunk`, `Reassembler`, `UserAmpInfo`, `user_amp_upload`, `user_amp_delete`, `user_ir_upload`, `user_ir_name`, `data_frames`, `check`, `floats_to_bytes`, `bytes_to_floats` | `upload` |
 | `open_stomp.device` | `Device`, `Update` | `device` |
 
 ## Quick start
@@ -167,6 +169,45 @@ p.index = 21                       # store to P22 (or keep `source` to overwrite
 p.name = "Lead"                    # <= 16 printable ASCII; others become '?'
 dev.save_preset(source, p)         # name, record, then select the saved slot
 ```
+
+### Importing a NAM model
+
+```python
+dev.import_nam_file(2, "Jcm800.nam")          # optimised conversion (~1 min, GIL released) + upload to USER AMP 03
+dev.import_nam_file(2, "Jcm800.nam", measure="app")   # the official algorithm (~4 s)
+```
+
+Or step by step:
+
+```python
+from open_stomp import nam
+
+model = nam.Model.load("Jcm800.nam")
+c = nam.convert(model, measure="optimised")   # or nam.convert("Jcm800.nam", ...); the default is "app"
+dev.import_user_amp(2, "Jcm800", c.data, c.factor)
+out = model.process(samples)                  # run the network on your own audio (mono, 48 kHz)
+```
+
+For an exact match with the official app, pass its own test signal, read from an installed Stomp Manager:
+`nam.convert(model, excitation=nam.official_excitation())` (or `official_excitation("/path/to/Stomp Manager.app")`).
+This is opt-in; `dev.import_nam_file` never reads the official app.
+
+The optimised conversion (the default for `import_nam_file`) fits the filters with a simulation of the pedal; see
+[05](05-uploads-nam-ir.md#optimised-conversion).
+
+`Converted` also has every intermediate stage (`levels`, `levels3`, `bla_db`, `g1_gains_db`, `g1_ir`, `g2_ir`).
+
+### Uploading a user AMP or IR
+
+```python
+dev.import_user_amp(2, "Jcm800", floats)      # 2048 floats -> USER AMP 03 (factor=1.0 by default)
+dev.import_user_ir(0, "My Cab", floats)       # USER IR 01
+dev.delete_user_amp(2)
+```
+
+Converting `.nam`/`.wav` files into the 2048 floats isn't implemented yet ([05](05-uploads-nam-ir.md)); a captured
+conversion can be recovered with `upload.Chunk.parse` + `upload.Reassembler` and uploaded to any slot. A bad slot or
+data raises `ValueError`.
 
 ### Changing system settings
 
