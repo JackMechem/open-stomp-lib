@@ -8,8 +8,8 @@ Ordered by usefulness for a Linux editor. Each item says how to resolve it.
    Confirmed on hardware (2026-10-21, firmware V1.1.1): an Ampeg SVT model converted by the official algorithm and by
    ours, both uploaded by `open_stomp`, sound identical on the pedal. Left: LSTM/ConvNet NAM models (the app's NAM
    core supports ConvNet too).
-2. **IR transform.** Capture an upload of a short plain cab IR (< 2048 samples) and compare sample by sample. Also
-   record which file was used for the existing capture (the two Tone Charm WAVs are candidates).
+2. **IR gain.** The IR transform is solved except for the gain (docs/05): the upload is the first 2048 samples of the
+   48 kHz IR, reversed, times `g`. Capture an import of a designed IR (impulses of known amplitude) to find the rule.
 3. **IR slot 4-byte field** (`0x09` record bytes 0–3): a CRC or a flag? It was `01 00 00 00` after an upload.
    Compare across two different IR uploads.
 4. **Preset unknown bytes**: offset 8 (`0x62`), 79–81, 82 (`6`), 90–93. Toggle things in the app that aren't

@@ -282,13 +282,17 @@ before" markers were typed after the action).
 
 ### What the 2048 floats are
 
-* The app converts any audio file to a 48 kHz WAV first (JUCE in `nux_plugins`: `*_ir_48.wav`).
-* The uploaded 2048 samples (≈ 42.7 ms at 48 kHz) are **not** a straight copy of the start of the WAV. The test file
-  was a long (10 s / 20 s) delay/reverb "IR", and correlation with either candidate file was weak (≈ −0.3 at best,
-  with lead-in trimmed so the peak lands at sample ~253). The app likely trims, normalises and possibly windows or
-  minimum-phases the IR.
-* Re-test with a short, plain cab IR (< 2048 samples) to pin the transform down. Probably just
-  trim + normalise + truncate.
+* The app converts any audio file to a 48 kHz WAV first (JUCE in `nux_plugins`: `convertAudioToWaveFormat` writes
+  `*_ir_48.wav` / `*_t_ir_48.wav`, `loadAudioFileData` reads it back to the Dart side).
+* **The upload is the first 2048 samples of that 48 kHz IR, time-reversed, times a gain** (2026-10): `data[2047 − k] =
+  g · ir[k]`, the same reversed layout as the NAM filters. Checked on the one captured upload (`examples/ir_check`):
+  reversed, with no offset, it matches "Delay And Reverb Ambient Shoegaze Machine percussive verb 1.wav" exactly
+  (residual −120 dB, float rounding), so that is the file that was imported. No trimming, windowing or
+  minimum-phase conversion.
+* **The gain rule is not known yet.** Here `g` = 12.5344 (+21.96 dB). It is not 1/peak (of the 2048 samples or the
+  file), 1/rms or unit energy over 1024/2000/2048/4096/8192 samples or the whole file, 1/Σ|x|, nor 0 dB at a fixed
+  frequency. Unit energy over the 2048 uploaded samples comes closest (0.36 dB low). The rule is probably in the
+  app's Dart code (the IR flow lives in `App.framework`); a second capture with a designed IR (e.g. two impulses of
+  known amplitude) would settle it.
 
-Vector: `captures/files/ir/IR01.device_floats.bin` (log marker `imported Jcm800`, cmd 0x10, sub 0). Which of the two
-WAVs was used was not recorded (open question).
+Vector: `captures/files/ir/IR01.device_floats.bin` (log marker `imported Jcm800`, cmd 0x10, sub 0). The imported file was the "percussive verb 1" WAV (above).

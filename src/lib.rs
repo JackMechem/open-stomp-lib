@@ -42,6 +42,7 @@
 
 pub mod capture;
 pub mod catalog;
+pub mod ir;
 #[cfg(feature = "device")]
 pub mod device;
 pub mod midi;
