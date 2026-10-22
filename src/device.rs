@@ -246,21 +246,24 @@ impl Device {
         Ok(())
     }
 
-    /// Convert a `.nam` file ([`fn@crate::nam::convert`]) and import it into user AMP `slot` (0–9),
-    /// named after the file like the official app does. Uses only open-stomp's own converter; it
-    /// never reads the official app (see [`crate::nam::convert::official_excitation`] to opt in). The conversion runs on the calling thread
-    /// and takes a few seconds (optimised build). Returns the conversion for inspection.
+    /// Convert a `.nam` file with the best conversion, [`Measure::Optimised`](crate::nam::convert::Measure::Optimised)
+    /// (closer to the model on hardware than the official app's), and import it into user AMP
+    /// `slot` (0–9), named after the file like the official app does. Never reads the official app
+    /// (see [`crate::nam::convert::official_excitation`] to opt in). The conversion runs on the
+    /// calling thread and takes about a minute (optimised build); [`Device::import_nam_file_with`]
+    /// with `Measure::App` gives the official algorithm in a few seconds. Returns the conversion.
     #[cfg(feature = "nam")]
     pub fn import_nam_file(
         &self,
         slot: u8,
         path: impl AsRef<std::path::Path>,
     ) -> Result<crate::nam::Converted, Box<dyn std::error::Error + Send + Sync>> {
-        self.import_nam_file_with(slot, path, crate::nam::convert::Measure::App)
+        self.import_nam_file_with(slot, path, crate::nam::convert::Measure::Optimised)
     }
 
     /// [`Device::import_nam_file`] with a choice of conversion
-    /// ([`Measure`](crate::nam::convert::Measure)); `Measure::Optimised` takes about a minute.
+    /// ([`Measure`](crate::nam::convert::Measure)): `Optimised` (the default, about a minute),
+    /// `App` (the official algorithm, a few seconds) or `Clean`.
     #[cfg(feature = "nam")]
     pub fn import_nam_file_with(
         &self,

@@ -326,7 +326,6 @@ pub enum Measure {
     /// Exactly as the official app: one 8192-sample run from the model's reset state, DC blocker
     /// starting from zero. Below ~100 Hz the blocker's start-up transient dominates (docs/05), so
     /// the low bass of the result follows that transient rather than the model.
-    #[default]
     App,
     /// The excitation played twice and measured on the second, steady-state period: no transient,
     /// the model's actual small-signal response at every frequency. Departs from the app on purpose,
@@ -334,7 +333,9 @@ pub enum Measure {
     Clean,
     /// [`Clean`](Measure::Clean), then G1/G2 fitted with a simulation of the pedal until it
     /// sounds like the model ([`super::optimise`]). About a minute per model (optimised build).
-    /// Closer to the model than the app's conversion; see docs/05.
+    /// Closer to the model than the app's conversion on hardware (docs/05); the default for
+    /// `Device::import_nam_file`.
+    #[default]
     Optimised,
 }
 

@@ -22,8 +22,9 @@ cross-platform editor, is built on it.
   official app's captured writes.
 * **Pace requests** the way the pedal needs: one SysEx in flight, reply matching, timeouts (`RequestQueue`, pure).
 * **Import NAM amp models** (feature `nam`): load and run `.nam` files (a Rust port of NeuralAmpModelerCore) and
-  convert them for the pedal with the official app's algorithm, reverse engineered (`Device::import_nam_file`),
-  or with an optimiser that fits the pedal's filters to the model through a simulation of the pedal.
+  convert them for the pedal with an optimiser that fits the pedal's filters to the model through a simulation of
+  the pedal (`Device::import_nam_file`; closer to the model than the official app), or with the official app's
+  algorithm, reverse engineered.
 * **Run the connection** (feature `device`): find the pedal, connect, follow hotplug, perform the official app's
   startup sync, send edits, report everything. It can also replay a capture log so you can develop without a pedal.
 

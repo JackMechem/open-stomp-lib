@@ -242,8 +242,11 @@ byte against the captured *save as*.
 ### Importing a NAM model
 
 ```rust
-dev.import_nam_file(2, "Jcm800.nam")?;            // convert (~4 s, optimised build) + upload to USER AMP 03
+dev.import_nam_file(2, "Jcm800.nam")?;            // optimised conversion (~1 min, optimised build) + upload to USER AMP 03
 ```
+
+This uses the optimised conversion (below), the closest to the model on hardware. For the official app's algorithm
+(a few seconds), use `dev.import_nam_file_with(2, "Jcm800.nam", Measure::App)`.
 
 Or step by step, e.g. to inspect or cache the result:
 
@@ -255,7 +258,7 @@ let c = convert(&mut model);                     // c.data: the 2048 floats, c.f
 dev.import_user_amp(2, "Jcm800", &c.data, c.factor)?;
 ```
 
-`Model` also runs the network on your own audio (`model.process(&input, &mut output)`, mono, 48 kHz). The converter
+`Model` also runs the network on your own audio (`model.process(&input, &mut output)`, mono, 48 kHz). `convert`
 reproduces the official app's algorithm; with our own test signal the resulting filters are within ~1–1.5 dB rms of
 the app's (the app's own measurement noise, see [05](05-uploads-nam-ir.md#our-implementation)).
 For an exact match with the official app, use its own test signal from an installed Stomp Manager:
@@ -267,14 +270,14 @@ let c = convert::convert_with(&mut model, &x);                          // = the
 
 This is opt-in; `dev.import_nam_file` never reads the official app.
 
-**Optimised conversion** (experimental, about a minute per model): instead of copying the app's algorithm, fit the
-two filters with a simulation of the pedal until it sounds like the model ([05](05-uploads-nam-ir.md#optimised-conversion)).
+**Optimised conversion** (the default for `import_nam_file`, about a minute per model): instead of copying the app's
+algorithm, fit the two filters with a simulation of the pedal until it sounds like the model
+([05](05-uploads-nam-ir.md#optimised-conversion)).
 
 ```rust
 use open_stomp::nam::convert::Measure;
 
-dev.import_nam_file_with(2, "Jcm800.nam", Measure::Optimised)?;
-// or: convert::convert_measured(&mut model, &convert::excitation(), Measure::Optimised)
+let c = convert::convert_measured(&mut model, &convert::excitation(), Measure::Optimised);
 // or, with your own starting point and settings: nam::optimise::optimise(&mut model, &init_data, &options)
 ```
 

@@ -173,7 +173,8 @@ dev.save_preset(source, p)         # name, record, then select the saved slot
 ### Importing a NAM model
 
 ```python
-dev.import_nam_file(2, "Jcm800.nam")          # convert (~4 s, GIL released) + upload to USER AMP 03
+dev.import_nam_file(2, "Jcm800.nam")          # optimised conversion (~1 min, GIL released) + upload to USER AMP 03
+dev.import_nam_file(2, "Jcm800.nam", measure="app")   # the official algorithm (~4 s)
 ```
 
 Or step by step:
@@ -182,7 +183,7 @@ Or step by step:
 from open_stomp import nam
 
 model = nam.Model.load("Jcm800.nam")
-c = nam.convert(model)                        # or nam.convert("Jcm800.nam")
+c = nam.convert(model, measure="optimised")   # or nam.convert("Jcm800.nam", ...); the default is "app"
 dev.import_user_amp(2, "Jcm800", c.data, c.factor)
 out = model.process(samples)                  # run the network on your own audio (mono, 48 kHz)
 ```
@@ -191,9 +192,8 @@ For an exact match with the official app, pass its own test signal, read from an
 `nam.convert(model, excitation=nam.official_excitation())` (or `official_excitation("/path/to/Stomp Manager.app")`).
 This is opt-in; `dev.import_nam_file` never reads the official app.
 
-Optimised conversion (experimental, about a minute per model; fits the filters with a simulation of the pedal, see
-[05](05-uploads-nam-ir.md#optimised-conversion)): `dev.import_nam_file(2, "Jcm800.nam", measure="optimised")` or
-`nam.convert(model, measure="optimised")`.
+The optimised conversion (the default for `import_nam_file`) fits the filters with a simulation of the pedal; see
+[05](05-uploads-nam-ir.md#optimised-conversion).
 
 `Converted` also has every intermediate stage (`levels`, `levels3`, `bla_db`, `g1_gains_db`, `g1_ir`, `g2_ir`).
 

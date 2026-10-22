@@ -345,10 +345,10 @@ impl Device {
     }
 
     /// Convert a `.nam` file and import it into user AMP `slot` (0–9), named after the file, with
-    /// open-stomp's own converter (never reads the official app). `measure` as for
-    /// `nam.convert`: `"app"` (default), `"clean"` or `"optimised"` (about a minute).
-    /// Releases the GIL during the conversion (a few seconds). Returns the conversion.
-    #[pyo3(signature = (slot, path, measure = "app"))]
+    /// open-stomp's own converter (never reads the official app). `measure`: `"optimised"` (the
+    /// default and the closest to the model, about a minute), `"app"` (the official algorithm, a
+    /// few seconds) or `"clean"`. Releases the GIL during the conversion. Returns the conversion.
+    #[pyo3(signature = (slot, path, measure = "optimised"))]
     fn import_nam_file(
         &self,
         py: Python<'_>,
