@@ -6,7 +6,7 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-10-22
 
 ### Added
 - NAM import level normalisation, like NAM plugins: `nam::convert::normalise_level` scales G2 (after the pedal's
