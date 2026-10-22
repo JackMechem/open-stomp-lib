@@ -30,7 +30,8 @@ All notable changes to `open-stomp`. The format follows
   from the clean conversion. Hand-written gradients, Adam, no ML framework. On hardware (Ampeg SVT
   bass model) it scores 6.72–6.85 dB rms error against the real model, against 9.32 for the
   official conversion in the same session. `Device::import_nam_file_with(.., Measure::App)` keeps
-  the official algorithm (a few seconds). Also `optimise::simulate`, example `nam_optimise`.
+  the official algorithm (a few seconds). Progress and cancel: `convert::convert_optimised`,
+  `optimise::optimise_with_progress`. Also `optimise::simulate`, example `nam_optimise`.
   Python: `Device.import_nam_file(..., measure="optimised")` (default) and `nam.convert(...,
   measure="optimised")`.
 - `nam::convert::official_excitation` / `find_official_excitation`: read the official app's test

@@ -355,13 +355,20 @@ pub fn convert_with(model: &mut Model, bla_x: &[f32]) -> Converted {
     convert_measured(model, bla_x, Measure::App)
 }
 
+/// [`Measure::Optimised`] with progress: `on_step(done, total)` after each optimiser step (the
+/// clean measurement and the model render before the first take about a fifth of the time).
+/// Returning `false` stops early with the best result so far.
+pub fn convert_optimised(model: &mut Model, bla_x: &[f32], on_step: &mut dyn FnMut(usize, usize) -> bool) -> Converted {
+    let mut c = convert_measured(model, bla_x, Measure::Clean);
+    let o = super::optimise::optimise_with_progress(model, &c.data, &super::optimise::Options::default(), on_step);
+    (c.data, c.g1_ir, c.g2_ir) = (o.data, o.g1_ir, o.g2_ir);
+    c
+}
+
 /// Convert with a given excitation and measurement mode. Resets the model first.
 pub fn convert_measured(model: &mut Model, bla_x: &[f32], measure: Measure) -> Converted {
     if measure == Measure::Optimised {
-        let mut c = convert_measured(model, bla_x, Measure::Clean);
-        let o = super::optimise::optimise(model, &c.data, &super::optimise::Options::default());
-        (c.data, c.g1_ir, c.g2_ir) = (o.data, o.g1_ir, o.g2_ir);
-        return c;
+        return convert_optimised(model, bla_x, &mut |_, _| true);
     }
     assert_eq!(bla_x.len(), N, "the excitation is {N} samples");
     let fft = Fft::new();

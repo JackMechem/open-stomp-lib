@@ -844,7 +844,8 @@ impl Problem {
     }
 
     /// Adam from curves `c`; returns the best curves and responses seen, and the objective per step.
-    fn fit(&self, mut c: Pair, o: &Options) -> (Pair, Pair, Vec<f64>) {
+    /// `on_step(done, total)` after each step; returning `false` stops early (best so far kept).
+    fn fit(&self, mut c: Pair, o: &Options, on_step: &mut dyn FnMut(usize, usize) -> bool) -> (Pair, Pair, Vec<f64>) {
         let (b1, b2, eps) = (0.9, 0.999, 1e-8);
         let mut m = [vec![0.0; CURVE_POINTS], vec![0.0; CURVE_POINTS]];
         let mut v = m.clone();
@@ -870,6 +871,9 @@ impl Problem {
                     c[j][i] -= lr / bc1 * m[j][i] / ((v[j][i] / bc2).sqrt() + eps);
                 }
             }
+            if !on_step(it + 1, o.steps) {
+                break;
+            }
         }
         let (_, bc, birs) = best.unwrap_or_else(|| {
             let e = self.evaluate(&c, o.smoothness);
@@ -884,13 +888,24 @@ impl Problem {
 /// conversion). Runs the model over the test signal once, then `options.steps` simulations; about
 /// a minute per 300 steps in an optimised build.
 pub fn optimise(model: &mut Model, init: &[f32], options: &Options) -> Optimised {
+    optimise_with_progress(model, init, options, &mut |_, _| true)
+}
+
+/// [`optimise`], calling `on_step(done, total)` after each step (the model render before the first
+/// takes about a sixth of the time). Returning `false` stops early with the best result so far.
+pub fn optimise_with_progress(
+    model: &mut Model,
+    init: &[f32],
+    options: &Options,
+    on_step: &mut dyn FnMut(usize, usize) -> bool,
+) -> Optimised {
     let signal = test_signal();
     let target = render_target(model, &signal.x);
     let problem = Problem::new(&signal.x, &target, &train_slices(&signal.segments));
     let (h1, h2) = super::convert::pedal_irs(init);
     let c0 = [problem.curves.of(&h1), problem.curves.of(&h2)];
     let initial_loss = problem.evaluate(&c0, options.smoothness).value;
-    let ([g1_curve, g2_curve], [g1_ir, g2_ir], loss) = problem.fit(c0, options);
+    let ([g1_curve, g2_curve], [g1_ir, g2_ir], loss) = problem.fit(c0, options, on_step);
     Optimised { data: super::convert::upload_data(&g1_ir, &g2_ir), g1_ir, g2_ir, g1_curve, g2_curve, initial_loss, loss }
 }
 
@@ -1077,8 +1092,21 @@ mod tests {
         let o = Options { steps: want.len(), ..Options::default() };
         let c = [c0[..CURVE_POINTS].to_vec(), c0[CURVE_POINTS..].to_vec()];
         // each loss after the first follows an Adam step, so this checks the updates too
-        let (_, _, history) = problem.fit(c, &o);
+        let (_, _, history) = problem.fit(c, &o, &mut |_, _| true);
         assert!(rel_err(&history, &want) < 1e-9, "{history:?} vs {want:?}");
+    }
+
+    #[test]
+    fn optimiser_reports_progress_and_stops_early() {
+        let problem = Problem::new(&golden("sim_x"), &golden("sim_tgt"), &golden_slices());
+        let c0 = golden("opt_c0");
+        let c = [c0[..CURVE_POINTS].to_vec(), c0[CURVE_POINTS..].to_vec()];
+        let mut seen = vec![];
+        let (_, irs, history) = problem.fit(c, &Options { steps: 8, ..Options::default() }, &mut |d, t| {
+            seen.push((d, t));
+            d < 3
+        });
+        assert_eq!((seen, history.len(), irs[0].len()), (vec![(1, 8), (2, 8), (3, 8)], 3, PEDAL_TAPS));
     }
 
     #[test]
