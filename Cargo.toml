@@ -71,3 +71,7 @@ required-features = ["nam"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[example]]
+name = "ir_compare"
+required-features = ["nam"]

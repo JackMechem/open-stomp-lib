@@ -295,6 +295,10 @@ samples reversed and scaled), then `dev.import_user_ir(slot, name, &c.data)`. Th
 recovered from its code and identical to its uploads ([05](05-uploads-nam-ir.md)). `ir::resample` (windowed sinc),
 `ir::resample_like_app` and `Wav::to_bytes` are there for your own processing.
 
+The pedal only plays the first 384 samples (8 ms) of an IR, so long IRs, or IRs that start after a delay, lose a lot
+on the pedal with the app's conversion. `ir::convert_optimised` / `dev.import_ir_file_with(slot, path,
+ir::Method::Optimised)` fits a 384-tap filter to the whole IR instead ([05](05-uploads-nam-ir.md#optimised-ir-conversion)).
+
 ### Uploading a user AMP or IR
 
 ```rust

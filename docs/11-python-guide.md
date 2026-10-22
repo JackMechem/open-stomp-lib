@@ -208,6 +208,8 @@ rate, channels = ir.load_wav("My Cab.wav")    # also ir.save_wav, ir.resample
 ```
 
 The conversion is the official app's, recovered from its code and identical to its uploads ([05](05-uploads-nam-ir.md)).
+`method="optimised"` (`ir.convert`, `dev.import_ir_file`) fits the 384 samples the pedal actually plays to the whole IR
+instead, much closer on the pedal for long or delayed IRs ([05](05-uploads-nam-ir.md#optimised-ir-conversion)).
 
 ### Uploading a user AMP or IR
 

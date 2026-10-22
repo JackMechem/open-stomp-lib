@@ -50,10 +50,22 @@ fn save_wav(path: std::path::PathBuf, sample_rate: u32, channels: Vec<Vec<f32>>,
     std::fs::write(path, bytes).map_err(|e| PyOSError::new_err(e.to_string()))
 }
 
-/// Convert an IR WAV file (any sample rate; first channel) exactly like the official app.
+pub fn parse_method(method: &str) -> PyResult<i::Method> {
+    match method {
+        "app" => Ok(i::Method::App),
+        "optimised" => Ok(i::Method::Optimised),
+        other => Err(PyValueError::new_err(format!("method must be \"app\" or \"optimised\", not {other:?}"))),
+    }
+}
+
+/// Convert an IR WAV file (any sample rate; first channel). `method`: `"app"` (exactly the
+/// official app's conversion, default) or `"optimised"` (a 384-tap filter fitted to the whole IR:
+/// the pedal only plays the first 384 taps).
 #[pyfunction]
-fn convert(path: std::path::PathBuf) -> PyResult<ConvertedIr> {
-    Ok(i::convert(&i::Wav::load(path).map_err(err)?).into())
+#[pyo3(signature = (path, method = "app"))]
+fn convert(path: std::path::PathBuf, method: &str) -> PyResult<ConvertedIr> {
+    let m = parse_method(method)?;
+    Ok(i::convert_with(&i::Wav::load(path).map_err(err)?, m).into())
 }
 
 /// Resample samples from `src` Hz to `dst` Hz (windowed sinc; `like_app=True`: the official app's
@@ -72,5 +84,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(resample, m)?)?;
     m.add("IR_TAPS", i::IR_TAPS)?;
     m.add("SAMPLE_RATE", i::IR_SAMPLE_RATE)?;
+    m.add("PEDAL_TAPS", i::PEDAL_IR_TAPS)?;
     Ok(())
 }

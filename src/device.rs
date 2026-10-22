@@ -313,11 +313,21 @@ impl Device {
         slot: u8,
         path: impl AsRef<std::path::Path>,
     ) -> Result<crate::ir::ConvertedIr, Box<dyn std::error::Error + Send + Sync>> {
+        self.import_ir_file_with(slot, path, crate::ir::Method::App)
+    }
+
+    /// [`Device::import_ir_file`] with a choice of conversion ([`crate::ir::Method`]).
+    pub fn import_ir_file_with(
+        &self,
+        slot: u8,
+        path: impl AsRef<std::path::Path>,
+        method: crate::ir::Method,
+    ) -> Result<crate::ir::ConvertedIr, Box<dyn std::error::Error + Send + Sync>> {
         let path = path.as_ref();
         if slot >= upload::USER_SLOTS {
             return Err(Box::new(UploadError::Slot(slot)));
         }
-        let converted = crate::ir::convert(&crate::ir::Wav::load(path)?);
+        let converted = crate::ir::convert_with(&crate::ir::Wav::load(path)?, method);
         self.import_user_ir(slot, &crate::ir::slot_name(path), &converted.data)?;
         Ok(converted)
     }

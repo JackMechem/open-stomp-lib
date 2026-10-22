@@ -346,6 +346,263 @@ pub fn convert(wav: &Wav) -> ConvertedIr {
     ConvertedIr { data, gain: gain as f32, ir }
 }
 
+// ---------------------------------------------------------------------------------------------
+// optimised conversion (feature `nam`, for the FFT)
+
+/// FFT length of the minimum-phase design (1.46 Hz per bin at 48 kHz).
+#[cfg(feature = "nam")]
+const DESIGN_FFT: usize = 1 << 15;
+/// Smoothing of the target response: ±1/12 octave (1/6-octave bands).
+#[cfg(feature = "nam")]
+const SMOOTH: f64 = 1.059_463_094_359_295_3; // 2^(1/12)
+
+/// Fractional-octave power smoothing on an rfft grid (`p`: power per bin).
+#[cfg(feature = "nam")]
+fn smooth_power(p: &[f64]) -> Vec<f64> {
+    let mut pre = Vec::with_capacity(p.len() + 1);
+    pre.push(0.0);
+    for v in p {
+        pre.push(pre.last().unwrap() + v);
+    }
+    (0..p.len())
+        .map(|k| {
+            let lo = ((k as f64 / SMOOTH).floor() as usize).min(k);
+            let hi = ((k as f64 * SMOOTH).ceil() as usize).max(k).min(p.len() - 1);
+            (pre[hi + 1] - pre[lo]) / (hi + 1 - lo) as f64
+        })
+        .collect()
+}
+
+/// `|FFT(x, n)|²` for bins 0..=n/2.
+#[cfg(feature = "nam")]
+fn power_spectrum(x: &[f64], n: usize) -> Vec<f64> {
+    use rustfft::num_complex::Complex64;
+    let mut c: Vec<Complex64> = x.iter().take(n).map(|&v| Complex64::new(v, 0.0)).collect();
+    c.resize(n, Complex64::default());
+    rustfft::FftPlanner::new().plan_fft_forward(n).process(&mut c);
+    c[..n / 2 + 1].iter().map(|v| v.norm_sqr()).collect()
+}
+
+/// A minimum-phase impulse response with magnitude `mag` (bins 0..=n/2 of an `n`-point grid),
+/// by the folded real cepstrum.
+#[cfg(feature = "nam")]
+fn min_phase(mag: &[f64], taps: usize) -> Vec<f64> {
+    use rustfft::num_complex::Complex64;
+    let n = (mag.len() - 1) * 2;
+    let mut p = rustfft::FftPlanner::new();
+    let (fwd, inv) = (p.plan_fft_forward(n), p.plan_fft_inverse(n));
+    let floor = mag.iter().fold(0f64, |m, &v| m.max(v)) * 1e-6;
+    let mut c: Vec<Complex64> = (0..n).map(|k| Complex64::new(mag[k.min(n - k)].max(floor).ln(), 0.0)).collect();
+    inv.process(&mut c);
+    for (i, v) in c.iter_mut().enumerate() {
+        let w = match i {
+            0 => 1.0,
+            i if i < n / 2 => 2.0,
+            i if i == n / 2 => 1.0,
+            _ => 0.0,
+        };
+        *v = Complex64::new(v.re / n as f64 * w, 0.0);
+    }
+    fwd.process(&mut c);
+    for v in c.iter_mut() {
+        *v = v.exp();
+    }
+    inv.process(&mut c);
+    c[..taps].iter().map(|v| v.re / n as f64).collect()
+}
+
+/// Bands of the fit: 1/6 octave wide, every 1/12 octave from 25 Hz to 20 kHz, as bin ranges of an
+/// `n`-point FFT at 48 kHz.
+#[cfg(feature = "nam")]
+fn fit_bands(n: usize) -> Vec<std::ops::Range<usize>> {
+    let hz = |f: f64| f * n as f64 / IR_SAMPLE_RATE as f64;
+    std::iter::successors(Some(25.0f64), |f| Some(f * 2f64.powf(1.0 / 12.0)))
+        .take_while(|&f| f <= 20000.0)
+        .map(|f| {
+            let (lo, hi) = (hz(f / SMOOTH).floor() as usize, hz(f * SMOOTH).ceil() as usize);
+            lo..hi.max(lo + 1)
+        })
+        .collect()
+}
+
+/// Fit `h0`'s taps directly to the full IR's band levels: Adam on the variance of the dB error
+/// over [`fit_bands`] (the level is left free; [`app_gain`] sets it afterwards), with the gradient
+/// through the FFT written out.
+#[cfg(feature = "nam")]
+fn refine(h0: &[f64], nf: usize, full_smoothed: &[f64]) -> Vec<f64> {
+    use rustfft::num_complex::Complex64;
+    let n = DESIGN_FFT;
+    let bands = fit_bands(n);
+    // target band levels (dB) from the full IR's spectrum, on the same frequencies
+    let step = nf / n;
+    let target: Vec<f64> = bands
+        .iter()
+        .map(|b| {
+            let p = b.clone().map(|k| full_smoothed[k * step]).sum::<f64>() / b.len() as f64;
+            10.0 * p.max(1e-30).log10()
+        })
+        .collect();
+    let mut planner = rustfft::FftPlanner::new();
+    let (fwd, inv) = (planner.plan_fft_forward(n), planner.plan_fft_inverse(n));
+    let scale = h0.iter().fold(0f64, |m, v| m.max(v.abs())).max(1e-12);
+    let mut h: Vec<f64> = h0.iter().map(|v| v / scale).collect();
+    let eval = |h: &[f64], grad: Option<&mut [f64]>| -> f64 {
+        let mut c: Vec<Complex64> = h.iter().map(|&v| Complex64::new(v, 0.0)).collect();
+        c.resize(n, Complex64::default());
+        fwd.process(&mut c);
+        let p: Vec<f64> = bands.iter().map(|b| b.clone().map(|k| c[k].norm_sqr()).sum::<f64>() / b.len() as f64).collect();
+        let d: Vec<f64> = p.iter().zip(&target).map(|(p, t)| 10.0 * p.max(1e-30).log10() - t).collect();
+        let mean = d.iter().sum::<f64>() / d.len() as f64;
+        let e = d.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / d.len() as f64;
+        if let Some(g) = grad {
+            // dE/dH_k for every bin of every band, then back to the taps through the FFT
+            let mut gk = vec![Complex64::default(); n];
+            for ((b, dv), pv) in bands.iter().zip(&d).zip(&p) {
+                let de_dp = 2.0 * (dv - mean) / d.len() as f64 * 10.0 / (std::f64::consts::LN_10 * pv.max(1e-30));
+                for k in b.clone() {
+                    gk[k] += c[k] * (2.0 * de_dp / b.len() as f64);
+                }
+            }
+            inv.process(&mut gk);
+            for (gi, v) in g.iter_mut().zip(&gk) {
+                *gi = v.re;
+            }
+        }
+        e
+    };
+    let (b1, b2, eps, lr) = (0.9, 0.999, 1e-12, 2e-3);
+    let (mut m, mut v) = (vec![0.0; h.len()], vec![0.0; h.len()]);
+    let mut g = vec![0.0; h.len()];
+    let mut best = (eval(&h, None), h.clone());
+    let steps: usize = 400;
+    for it in 0..steps {
+        let e = eval(&h, Some(&mut g));
+        if e < best.0 {
+            best = (e, h.clone());
+        }
+        let t = (it + 1) as i32;
+        let rate = lr * 0.5 * (1.0 + (std::f64::consts::PI * it as f64 / steps as f64).cos());
+        for i in 0..h.len() {
+            m[i] = b1 * m[i] + (1.0 - b1) * g[i];
+            v[i] = b2 * v[i] + (1.0 - b2) * g[i] * g[i];
+            h[i] -= rate * (m[i] / (1.0 - f64::powi(b1, t))) / ((v[i] / (1.0 - f64::powi(b2, t))).sqrt() + eps);
+        }
+    }
+    let e = eval(&h, None);
+    if e < best.0 {
+        best = (e, h);
+    }
+    best.1.iter().map(|v| v * scale).collect()
+}
+
+/// The optimised conversion: a [`PEDAL_IR_TAPS`]-tap filter (the part of an upload the pedal
+/// plays) with the whole IR's 1/6-octave magnitude response, instead of the IR's first 2048 samples
+/// cut off by the pedal after 384. The file is resampled with [`resample`] (windowed sinc); the
+/// filter is minimum-phase (no leading delay, energy packed into the start), refined over a few
+/// iterations, then fitted tap by tap to the full IR's band levels. Its level is the one the app
+/// means to give the IR ([`app_gain`] on the IR's first 2048 samples from its onset), matched
+/// over 100 Hz – 8 kHz. The unused part of the upload is zero.
+#[cfg(feature = "nam")]
+pub fn convert_optimised(wav: &Wav) -> ConvertedIr {
+    let ch = wav.channels.first().map(Vec::as_slice).unwrap_or(&[]);
+    let ir = resample(ch, wav.sample_rate, IR_SAMPLE_RATE);
+    let x: Vec<f64> = ir.iter().map(|&v| v as f64).collect();
+    let nf = x.len().next_power_of_two().max(DESIGN_FFT);
+    let full = smooth_power(&power_spectrum(&x, nf));
+    let step = nf / DESIGN_FFT;
+    // the target on the design grid (magnitude), never below -120 dB of its peak
+    let target: Vec<f64> = (0..=DESIGN_FFT / 2).map(|k| full[k * step].sqrt()).collect();
+    let peak = target.iter().fold(0f64, |m, &v| m.max(v));
+    let target: Vec<f64> = target.iter().map(|&v| v.max(peak * 1e-6)).collect();
+
+    // the last 48 taps fade out (half cosine), so the cut at 384 doesn't ring
+    let fade = 48;
+    let window = |h: &mut [f64]| {
+        for (i, v) in h.iter_mut().enumerate().skip(PEDAL_IR_TAPS - fade) {
+            let t = (i - (PEDAL_IR_TAPS - fade)) as f64 / fade as f64;
+            *v *= 0.5 + 0.5 * (std::f64::consts::PI * t).cos();
+        }
+    };
+    // error of a design: rms of the log-magnitude difference over 30 Hz – 16 kHz (1/6-octave bins),
+    // with the level difference removed
+    let lo_bin = (30.0 * DESIGN_FFT as f64 / 48000.0) as usize;
+    let hi_bin = (16000.0 * DESIGN_FFT as f64 / 48000.0) as usize;
+    let probe: Vec<usize> = std::iter::successors(Some(lo_bin as f64), |b| Some(b * 2f64.powf(1.0 / 24.0)))
+        .map(|b| b.round() as usize)
+        .take_while(|&b| b <= hi_bin)
+        .collect();
+    let response = |h: &[f64]| -> Vec<f64> { smooth_power(&power_spectrum(h, DESIGN_FFT)).iter().map(|p| p.sqrt()).collect() };
+    let error = |r: &[f64]| {
+        let d: Vec<f64> = probe.iter().map(|&k| 20.0 * (r[k].max(1e-30) / target[k]).log10()).collect();
+        let mean = d.iter().sum::<f64>() / d.len() as f64;
+        (d.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / d.len() as f64).sqrt()
+    };
+    let mut design = target.clone();
+    let mut best: Option<(f64, Vec<f64>)> = None;
+    for _ in 0..12 {
+        let mut h = min_phase(&design, PEDAL_IR_TAPS);
+        window(&mut h);
+        let r = response(&h);
+        let e = error(&r);
+        if best.as_ref().is_none_or(|b| e < b.0) {
+            best = Some((e, h));
+        }
+        // push the design towards the target where the 384 taps fall short, within ±12 dB
+        for k in 0..design.len() {
+            let corr = (target[k] / r[k].max(1e-30)).powf(0.8);
+            design[k] = (design[k] * corr).clamp(target[k] / 4.0, target[k] * 4.0);
+        }
+    }
+    let h0 = best.map(|b| b.1).unwrap_or_default();
+    let h = refine(&h0, nf, &full);
+    // level: what the app means to give this IR (its rule on the first 2048 samples, counted from
+    // the IR's onset so leading silence doesn't skew it), matched over 100 Hz – 8 kHz
+    let peak_x = x.iter().fold(0f64, |m, v| m.max(v.abs()));
+    let onset = x.iter().position(|v| v.abs() > 0.01 * peak_x).unwrap_or(0).saturating_sub(8);
+    let head: Vec<f32> = x[onset..].iter().take(IR_TAPS).map(|&v| v as f32).collect();
+    let g_ref = app_gain(&head);
+    let bands = fit_bands(DESIGN_FFT);
+    let step = nf / DESIGN_FFT;
+    let ours = smooth_power(&power_spectrum(&h, DESIGN_FFT));
+    let (mut sum, mut count) = (0.0, 0);
+    for b in &bands {
+        let f = b.start as f64 * IR_SAMPLE_RATE as f64 / DESIGN_FFT as f64;
+        if (100.0..=8000.0).contains(&f) {
+            let o = b.clone().map(|k| ours[k]).sum::<f64>() / b.len() as f64;
+            let t = b.clone().map(|k| full[k * step]).sum::<f64>() / b.len() as f64 * g_ref * g_ref;
+            sum += 10.0 * (t.max(1e-30) / o.max(1e-30)).log10();
+            count += 1;
+        }
+    }
+    let gain = 10f64.powf(sum / count.max(1) as f64 / 20.0);
+    let h: Vec<f32> = h.iter().map(|&v| v as f32).collect();
+    let mut data = vec![0.0f32; IR_TAPS];
+    for (k, &v) in h.iter().enumerate() {
+        data[IR_TAPS - 1 - k] = (gain * v as f64) as f32;
+    }
+    ConvertedIr { data, gain: gain as f32, ir }
+}
+
+/// How an IR is converted.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Method {
+    /// Exactly the official app's conversion ([`convert`]).
+    #[default]
+    App,
+    /// A 384-tap filter fitted to the whole IR ([`convert_optimised`]; feature `nam`).
+    #[cfg(feature = "nam")]
+    Optimised,
+}
+
+/// Convert with the given [`Method`].
+pub fn convert_with(wav: &Wav, method: Method) -> ConvertedIr {
+    match method {
+        Method::App => convert(wav),
+        #[cfg(feature = "nam")]
+        Method::Optimised => convert_optimised(wav),
+    }
+}
+
 /// The slot name the official app gives an imported IR: the file name without its extension, cut
 /// to 16 characters (seen in the one captured import; the record has room for 31).
 pub fn slot_name(path: &std::path::Path) -> String {
@@ -445,6 +702,25 @@ mod tests {
         // DC passes the low-pass at unity gain
         let dc = resample_like_app(&[0.5; 4000], 44100, 48000);
         assert!((dc[3000] - 0.5).abs() < 1e-4);
+    }
+
+    #[cfg(feature = "nam")]
+    #[test]
+    fn optimised_conversion_fits_a_delayed_ir_into_384_taps() {
+        // a decaying resonance that starts 1000 samples in: the official upload puts it out of the
+        // pedal's reach; the optimised one keeps its response within the 384 played taps
+        let x: Vec<f32> = (0..6000)
+            .map(|n| if n < 1000 { 0.0 } else { let t = (n - 1000) as f32; (-t / 120.0).exp() * (t * 0.05).sin() + if n == 1000 { 0.5 } else { 0.0 } })
+            .collect();
+        let w = Wav::new(48000, vec![x]);
+        let c = convert_optimised(&w);
+        assert_eq!(c.data.len(), IR_TAPS);
+        assert!(c.data[..IR_TAPS - PEDAL_IR_TAPS].iter().all(|&v| v == 0.0));
+        let played: f32 = c.data[IR_TAPS - PEDAL_IR_TAPS..].iter().map(|v| v * v).sum();
+        let official = convert(&w);
+        let official_played: f32 = official.data[IR_TAPS - PEDAL_IR_TAPS..].iter().map(|v| v * v).sum();
+        assert!(c.data.iter().all(|v| v.is_finite()) && played > 1e3 * official_played, "{played} vs {official_played}");
+        assert_eq!(convert_with(&w, Method::App).data, official.data);
     }
 
     #[test]

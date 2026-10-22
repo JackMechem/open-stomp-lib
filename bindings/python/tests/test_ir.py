@@ -27,3 +27,19 @@ def test_resample_length_and_errors(tmp_path):
     bad.write_bytes(b"not a wav")
     with pytest.raises(ValueError):
         ir.convert(bad)
+
+
+def test_optimised_conversion(tmp_path):
+    # a resonance starting 1000 samples in: the optimised upload keeps it within the 384 played taps
+    import math
+    x = [0.0] * 1000 + [math.exp(-n / 120) * math.sin(n * 0.05) for n in range(5000)]
+    x[1000] = 0.5
+    p = tmp_path / "late.wav"
+    ir.save_wav(p, 48000, [x], float=True)
+    c = ir.convert(p, method="optimised")
+    assert len(c.data) == 2048 and all(v == 0.0 for v in c.data[: 2048 - ir.PEDAL_TAPS])
+    played = sum(v * v for v in c.data[2048 - ir.PEDAL_TAPS :])
+    official = ir.convert(p)
+    assert played > 1000 * sum(v * v for v in official.data[2048 - ir.PEDAL_TAPS :])
+    with pytest.raises(ValueError):
+        ir.convert(p, method="best")
