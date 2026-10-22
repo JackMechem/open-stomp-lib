@@ -301,5 +301,16 @@ real reverb IR. `ir::convert` reproduces all of them (eight bit for bit, the res
 
 `convertAudioToWavWithOut` writes 2048 floats back out reversed as a 24-bit WAV (an export, not part of the import).
 
+### What the pedal plays: 384 of the 2048 IR samples (2026-10)
+
+Re-amping probe IRs (impulses at known taps, uploaded to USER IR 10, the CAB block on its own, sweep deconvolution
+divided by the dry path; `tools/pedalsim/ir_reamp_*.py`) shows that the pedal plays only the **first 384 taps (8 ms)**
+of an uploaded IR: impulses at taps 0–383 come back at their uploaded amplitude (within a few %), taps 384, 450, 500,
+1000, 1500 and 2040 not at all. In upload order that is `data[1664..2048]`; `data[0..1664]` is ignored. The CAB block's
+level is about unity (an impulse of 1.0 at tap 0 measures −0.1 … −0.8 dB against the dry path).
+
+So the official conversion's last 1664 samples are never heard, and its gain is computed on a response the pedal
+doesn't play. Like the NAM filters' 512-tap limit, this leaves room for a better conversion of long IRs.
+
 The first capture (`captures/files/ir/IR01.device_floats.bin`, log marker `imported Jcm800`) was the "percussive verb 1"
 WAV: gain 12.5344, reproduced to −138 dB.

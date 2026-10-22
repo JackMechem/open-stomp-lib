@@ -220,6 +220,9 @@ pub fn resample(x: &[f32], from: u32, to: u32) -> Vec<f32> {
 
 /// Samples per uploaded IR (42.7 ms at 48 kHz).
 pub const IR_TAPS: usize = 2048;
+/// Samples of an uploaded IR that the pedal actually plays (8 ms): `data[1664..2048]`, i.e. taps
+/// 0..383. Measured by re-amping probe IRs (docs/05).
+pub const PEDAL_IR_TAPS: usize = 384;
 /// The pedal's sample rate.
 pub const IR_SAMPLE_RATE: u32 = 48000;
 

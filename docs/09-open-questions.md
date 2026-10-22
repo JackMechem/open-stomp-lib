@@ -9,7 +9,8 @@ Ordered by usefulness for a Linux editor. Each item says how to resolve it.
    ours, both uploaded by `open_stomp`, sound identical on the pedal. Left: LSTM/ConvNet NAM models (the app's NAM
    core supports ConvNet too).
 2. ~~**IR transform**~~: solved (docs/05): resampled first channel, first 2048 samples reversed, gain centring the
-   398 Hz – 3 kHz response on 0 dB. `ir::convert` matches eleven captured imports.
+   398 Hz – 3 kHz response on 0 dB. `ir::convert` matches eleven captured imports. The pedal plays only the first
+   384 taps (docs/05).
 3. **IR slot 4-byte field** (`0x09` record bytes 0–3): `01 00 00 00` in all eleven imports captured (ten slots,
    different files and names), so probably a constant or a "slot in use" flag.
 4. **Preset unknown bytes**: offset 8 (`0x62`), 79–81, 82 (`6`), 90–93. Toggle things in the app that aren't
