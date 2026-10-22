@@ -64,6 +64,21 @@ fn optimiser_improves_on_the_clean_conversion() {
     assert!(y.len() == x.len() && y.iter().all(|v| v.is_finite()));
 }
 
+#[test]
+fn level_normalisation_is_a_volume_change_on_g2() {
+    let mut m = Model::load(format!("{DIR}wavenet.nam")).unwrap();
+    let c = convert::convert(&mut m);
+    let mut n = c.clone();
+    let gain_db = convert::normalise_level(&mut n, &mut m);
+    assert!((gain_db - (convert::NORMALISED_LEVEL_DB - convert::pedal_level_db(&mut m))).abs() < 1e-9);
+    // G1 untouched, G2 scaled by the gain
+    assert_eq!(n.data[..1024], c.data[..1024]);
+    let g = 10f64.powf(gain_db / 20.0);
+    for (a, b) in n.data[1024..].iter().zip(&c.data[1024..]) {
+        assert!((*a as f64 - *b as f64 * g).abs() <= 1e-6 * (*b as f64 * g).abs().max(1e-30));
+    }
+}
+
 /// Against the official app, when harness dumps are available locally (they contain vendor and
 /// third-party data, so they aren't in the repository). Set OPEN_STOMP_NAMCONV to a directory with
 /// `<name>.nam` and `<name>/` (a `tools/namconv/harness` dump) pairs.
