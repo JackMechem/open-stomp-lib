@@ -35,10 +35,10 @@ def test_replay(main_log):
 
 def test_recv_timeout_and_drain():
     dev = Device(auto_connect=False, sync=False)
-    t = time.monotonic()
+    t = time.perf_counter()  # time.monotonic() ticks every ~16 ms on Windows
     while dev.recv(timeout=0.2) is not None:  # initial ports / info updates
         pass
-    assert time.monotonic() - t >= 0.2
+    assert time.perf_counter() - t >= 0.19
     assert dev.drain() == [] and dev.try_recv() is None
     dev.close()
     dev.close()
