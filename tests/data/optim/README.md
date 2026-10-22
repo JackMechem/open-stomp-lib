@@ -1,7 +1,7 @@
 # Optimiser golden data
 
 Reference values for `nam::optimise` (the unit tests in `src/nam/optimise.rs`), produced by the Python/PyTorch
-optimiser that made the hardware-validated upload: open-stomp-manager `tools/pedalsim/golden.py`
+optimiser that made the hardware-validated upload: `tools/pedalsim/golden.py`
 (`golden.py <this dir>`). All inputs are synthetic or come from the repository's own MIT test model
 (`../nam/wavenet.nam`); no third-party or vendor data.
 

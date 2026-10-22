@@ -15,7 +15,7 @@
 //!   noise at several levels, starting from the [`Measure::Clean`](super::convert::Measure::Clean)
 //!   conversion. Gradients are written out by hand (no ML framework).
 //!
-//! A port of open-stomp-manager `tools/pedalsim` (PyTorch); `tests/data/optim` holds its reference
+//! A port of `tools/pedalsim` (PyTorch); `tests/data/optim` holds its reference
 //! values.
 
 use std::sync::Arc;

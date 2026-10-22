@@ -171,7 +171,7 @@ Two quirks are part of what the pedal gets, and the open converter copies both:
 
 ### What the pedal runs: 512 taps per filter (2026-10)
 
-Re-amping (a test signal through the pedal and through the real model, see open-stomp-manager `tools/pedalsim`)
+Re-amping (a test signal through the pedal and through the real model, see `tools/pedalsim`)
 shows that the pedal runs only the **first 512 taps** of each uploaded impulse response: `data[512..1024]` for G1 and
 `data[1536..2048]` for G2 (taps 511..0, reversed). `data[0..512]` and `data[1024..1536]` are ignored. A model of the
 pedal as

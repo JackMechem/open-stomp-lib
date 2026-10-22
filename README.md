@@ -113,6 +113,31 @@ amidi -p hw:2,0,0 -S 'F0 00 21 7A 00 F7' -d -t 1    # -> F0 00 21 7A 10 56 31 2E
 amidi -p hw:2,0,0 -d                                # turn knobs on the pedal and watch the CCs
 ```
 
+## NAM conversion: closer to the real model than the official app
+
+The pedal can't run a NAM network. It runs two 512-tap filters with a fixed saturation curve between them
+(`G2 ⊛ f(G1 ⊛ x)`), so every import is an approximation. The official app designs the two filters from two
+measurements of the model. open-stomp instead simulates the pedal (a model fitted from re-amp recordings) and
+optimises the filters until the simulated pedal sounds like the model. This is the default for
+`Device::import_nam_file`; it takes about a minute per model.
+
+Re-amped through the pedal and compared with the real model in software (Ampeg SVT bass model; rms error over
+1/3-octave sweep responses, note levels and harmonics; lower is better):
+
+| Upload | Frequency response | Note level | Harmonics | Overall |
+|---|---|---|---|---|
+| Official app | 7.96 dB | 9.64 dB | 13.11 dB | **9.32 dB** |
+| open-stomp, optimised (two runs) | 5.56 dB | 4.23 dB | 10.57–11.00 dB | **6.72–6.85 dB** |
+
+![Frequency response on the pedal: the real NAM model, the official app's conversion and open-stomp's](docs/images/nam-frequency-response.png)
+
+![Difference from the real model for both conversions](docs/images/nam-frequency-error.png)
+
+The official conversion is off by up to 15–24 dB in the deep bass, the 400 Hz–1 kHz mids at low levels and the top
+octave. open-stomp follows the model's shape much more closely. It is still 3–5 dB quiet overall and short on the
+60–100 Hz resonance, which 512 taps can't fully reach. Details: [docs/05](docs/05-uploads-nam-ir.md#optimised-conversion).
+The analysis code is in [`tools/pedalsim`](tools/pedalsim); `readme_plots.py --cached` redraws these graphs.
+
 ## Status
 
 | Area | Protocol | In the library |
@@ -125,7 +150,7 @@ amidi -p hw:2,0,0 -d                                # turn knobs on the pedal an
 | Preset rename / save-as | ✅ sequence captured | ✅ `host::save_preset`, byte-exact vs capture |
 | System settings | ✅ (some bytes unknown) | ✅ decode + encode |
 | User AMP (NAM) / user IR upload transport | ✅ chunk protocol decoded | ✅ `upload`, byte-exact vs capture |
-| NAM inference and NAM → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `nam`, verified against the app |
+| NAM inference and NAM → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `nam`, verified against the app; optimised conversion verified on hardware |
 | IR (audio) → device conversion | ❌ open | ❌ |
 
 Live CCs are verified on hardware. Preset and settings **writes** match the official app byte for byte but have not
@@ -182,11 +207,13 @@ To release:
 src/              the library (see docs/10 for the module map)
 bindings/python/  Python bindings (PyO3 + maturin): Rust glue, typed package, tests, examples
 examples/         monitor (live / replay), decode (capture → text), ports (list MIDI ports),
-                  nam_convert / nam_render / nam_check (NAM conversion, inference, comparisons)
+                  nam_convert / nam_optimise / nam_render / nam_check (NAM conversion, inference, comparisons)
 tests/            capture-driven integration tests (fake pedal, engine replay), NAM inference vs
                   NeuralAmpModelerCore (tests/data/nam: its MIT example models + reference outputs)
 captures/logs/    capture logs of the official app and the pedal: the test vectors
 docs/             the protocol documentation and the library guide
+tools/pedalsim/   the analysis behind the optimised NAM conversion (Python): re-amp rig, pedal
+                  simulator, PyTorch prototype of the optimiser, scoring, README graphs
 ```
 
 The capture/decoding tools and static-analysis artefacts that produced the docs live in the
