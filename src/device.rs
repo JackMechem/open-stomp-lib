@@ -307,7 +307,7 @@ impl Device {
 
     /// Convert an IR audio file ([`crate::ir::convert`]: WAV, any sample rate) and import it into
     /// user IR `slot` (0–9), named after the file like the official app does (first 16
-    /// characters). Returns the conversion. The gain is provisional (docs/09).
+    /// characters). Returns the conversion, identical to the official app's.
     pub fn import_ir_file(
         &self,
         slot: u8,

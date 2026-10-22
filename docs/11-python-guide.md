@@ -207,8 +207,7 @@ c = ir.convert("My Cab.wav")                  # c.data: the 2048 floats; c.gain,
 rate, channels = ir.load_wav("My Cab.wav")    # also ir.save_wav, ir.resample
 ```
 
-The conversion follows the official app's, except that the app's gain rule isn't known yet, so the level may differ
-by a dB or so ([09](09-open-questions.md)).
+The conversion is the official app's, recovered from its code and identical to its uploads ([05](05-uploads-nam-ir.md)).
 
 ### Uploading a user AMP or IR
 

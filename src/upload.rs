@@ -75,6 +75,9 @@ pub const IR_DATA_SUB: u8 = 0;
 /// One upload chunk (or a header-only request/ack), unpacked.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Chunk {
+    /// Header byte 0: the user IR slot in IR data (`0x10`) chunks, 0 in NAM uploads.
+    pub ir_slot: u8,
+    /// Header byte 1: the user AMP slot in NAM (`0x58`) chunks, 0 in IR data.
     pub slot: u8,
     pub sub: u8,
     /// Byte offset of `data` in the whole upload.
@@ -90,6 +93,7 @@ impl Chunk {
         let raw = unpack(payload);
         let h = raw.get(..12)?;
         Some(Chunk {
+            ir_slot: h[0],
             slot: h[1],
             sub: h[2],
             offset: u32::from_le_bytes(h[4..8].try_into().ok()?),
@@ -98,8 +102,9 @@ impl Chunk {
         })
     }
 
-    fn header(slot: u8, sub: u8, offset: u32, total: u32) -> [u8; 12] {
+    fn header(ir_slot: u8, slot: u8, sub: u8, offset: u32, total: u32) -> [u8; 12] {
         let mut h = [0u8; 12];
+        h[0] = ir_slot;
         h[1] = slot;
         h[2] = sub;
         h[4..8].copy_from_slice(&offset.to_le_bytes());
@@ -109,19 +114,21 @@ impl Chunk {
 
     /// The packed body: header + data.
     pub fn to_packed(&self) -> Vec<u8> {
-        let mut raw = Self::header(self.slot, self.sub, self.offset, self.total).to_vec();
+        let mut raw = Self::header(self.ir_slot, self.slot, self.sub, self.offset, self.total).to_vec();
         raw.extend_from_slice(&self.data);
         pack(&raw)
     }
 }
 
-/// Split `data` into `CHUNK_BYTES` write frames for `cmd` (`0x58` NAM data, `0x10` IR data).
+/// Split `data` into `CHUNK_BYTES` write frames for `cmd` (`0x58` NAM data, `0x10` IR data). The
+/// slot goes where each command expects it: header byte 1 for NAM, byte 0 for IR data.
 pub fn data_frames(cmd: Cmd, slot: u8, sub: u8, data: &[u8]) -> Vec<Vec<u8>> {
     let total = data.len() as u32;
+    let (ir_slot, slot) = if cmd == Cmd::IrData { (slot, 0) } else { (0, slot) };
     data.chunks(CHUNK_BYTES)
         .enumerate()
         .map(|(i, part)| {
-            let c = Chunk { slot, sub, offset: (i * CHUNK_BYTES) as u32, total, data: part.to_vec() };
+            let c = Chunk { ir_slot, slot, sub, offset: (i * CHUNK_BYTES) as u32, total, data: part.to_vec() };
             frame(cmd, Dir::Write, &c.to_packed())
         })
         .collect()
@@ -145,14 +152,16 @@ pub struct Reassembler {
 }
 
 impl Reassembler {
-    /// Add a data chunk. Returns the slot and floats once every byte has arrived.
+    /// Add a data chunk (NAM or IR). Returns the slot and floats once every byte has arrived.
     pub fn push(&mut self, c: &Chunk) -> Option<(u8, Vec<f32>)> {
         let (start, total) = (c.offset as usize, c.total as usize);
+        // the NAM slot or the IR slot, whichever header byte carries it
+        let slot = c.slot | c.ir_slot;
         // a chunk at offset 0, or for another slot/size, starts a new upload
-        if start == 0 || self.slot != Some(c.slot) || self.buf.len() != total {
+        if start == 0 || self.slot != Some(slot) || self.buf.len() != total {
             self.buf = vec![0; total];
             self.filled = 0;
-            self.slot = Some(c.slot);
+            self.slot = Some(slot);
         }
         let end = (start + c.data.len()).min(total);
         if start >= end {
@@ -162,7 +171,7 @@ impl Reassembler {
         self.filled += end - start;
         (self.filled >= total).then(|| {
             self.filled = 0;
-            (c.slot, bytes_to_floats(&self.buf))
+            (slot, bytes_to_floats(&self.buf))
         })
     }
 }
@@ -218,6 +227,7 @@ impl UserAmpInfo {
     /// The sub 3 write frame.
     pub fn write_frame(&self) -> Vec<u8> {
         let c = Chunk {
+            ir_slot: 0,
             slot: self.slot,
             sub: amp_sub::WRITE_INFO,
             offset: 0,
@@ -247,7 +257,7 @@ pub fn user_amp_upload(info: &UserAmpInfo, data: &[f32]) -> Vec<Vec<u8>> {
 
 /// Delete a user AMP slot (the app re-reads its info afterwards).
 pub fn user_amp_delete(slot: u8) -> Vec<u8> {
-    let c = Chunk { slot, sub: amp_sub::DELETE, offset: 0, total: 0, data: vec![] };
+    let c = Chunk { ir_slot: 0, slot, sub: amp_sub::DELETE, offset: 0, total: 0, data: vec![] };
     frame(Cmd::UserAmp, Dir::Write, &c.to_packed())
 }
 
@@ -263,9 +273,10 @@ pub fn user_ir_name(slot: u8, name: &str) -> Vec<u8> {
     frame(Cmd::IrSlot, Dir::Write, &p)
 }
 
-/// The official app's user IR import: the data, then the name. Only slot 0 has been captured;
-/// the slot in the data header is assumed to work like the NAM upload's. The app selects the
-/// CAB page and the slot's cab model (`host::head(Module::Cab, 30 + slot, true)`) just before.
+/// The official app's user IR import: the data (slot in header byte 0, unlike NAM's byte 1), then
+/// the name. Checked byte for byte against imports into all ten slots
+/// (`captures/logs/02-ir-tests.log`). The app selects the slot's cab model
+/// (`host::head(Module::Cab, 30 + slot, true)`) just before.
 pub fn user_ir_upload(slot: u8, name: &str, data: &[f32]) -> Vec<Vec<u8>> {
     let mut v = data_frames(Cmd::IrData, slot, IR_DATA_SUB, &floats_to_bytes(data));
     v.push(user_ir_name(slot, name));

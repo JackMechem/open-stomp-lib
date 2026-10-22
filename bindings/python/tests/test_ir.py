@@ -14,9 +14,9 @@ def test_wav_round_trip_and_convert(tmp_path):
     assert rate == 48000 and channels == [pytest.approx(x)]
     c = ir.convert(p)
     assert len(c.data) == ir.IR_TAPS == 2048
-    # reversed, cut to 2048 samples, unit energy
-    assert c.data[2047] == pytest.approx(0.6) and c.data[2037] == pytest.approx(-0.8)
-    assert c.gain == pytest.approx(2.0) and len(c.ir) == 3000
+    # reversed, cut to 2048 samples, scaled like the official app
+    assert c.data[2037] / c.data[2047] == pytest.approx(-0.4 / 0.3, rel=1e-5)
+    assert c.data[2047] == pytest.approx(0.3 * c.gain, rel=1e-5) and len(c.ir) == 3000
 
 
 def test_resample_length_and_errors(tmp_path):

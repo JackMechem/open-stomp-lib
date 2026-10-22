@@ -20,14 +20,14 @@ fn impulses(len: usize, at: &[(usize, f32)]) -> Vec<f32> {
 fn main() -> std::io::Result<()> {
     let dir = std::path::PathBuf::from(std::env::args().nth(1).unwrap_or_else(|| "tests/data/ir".into()));
     std::fs::create_dir_all(&dir)?;
-    let mono = |rate, x| Wav { sample_rate: rate, channels: vec![x] };
+    let mono = |rate, x| Wav::new(rate, vec![x]);
     let files: Vec<(&str, Wav, u16, bool)> = vec![
         ("T1 impulse", mono(48000, impulses(2048, &[(0, 0.5)])), 24, false),
         ("T2 two impulses", mono(48000, impulses(2048, &[(0, 0.5), (1000, -0.25)])), 24, false),
         ("T3 tail", mono(48000, impulses(4800, &[(0, 0.5), (3000, 0.9)])), 24, false),
         ("T4 quiet", mono(48000, impulses(2048, &[(0, 0.01)])), 24, false),
         ("T5 44k", mono(44100, impulses(2048, &[(100, 0.5)])), 24, false),
-        ("T6 stereo", Wav { sample_rate: 48000, channels: vec![impulses(2048, &[(0, 0.5)]), impulses(2048, &[(50, -0.5)])] }, 24, false),
+        ("T6 stereo", Wav::new(48000, vec![impulses(2048, &[(0, 0.5)]), impulses(2048, &[(50, -0.5)])]), 24, false),
         ("T7 short", mono(48000, impulses(100, &[(0, 0.5)])), 24, false),
         ("T8 float", mono(48000, impulses(2048, &[(0, 0.5), (10, 0.3)])), 32, true),
         ("T9 a name longer than sixteen", mono(48000, impulses(2048, &[(0, 0.25)])), 24, false),

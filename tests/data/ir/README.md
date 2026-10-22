@@ -1,8 +1,9 @@
 # Designed test IRs
 
 Written by `examples/ir_test_files.rs`. Each isolates one question about the official app's IR conversion
-(docs/05, docs/09): import `T1` … `T10` into USER IR 01 … 10 with the official app while capturing the MIDI traffic,
-then compare each upload with its file (`examples/ir_check`).
+(docs/05). They were imported into USER IR 01 … 10 with the official app while capturing
+(`captures/logs/02-ir-tests.log`); `tests/ir_import.rs` checks our conversion and upload against every import, and
+`examples/ir_capture_check` prints the comparison.
 
 | File | Content | Question |
 |---|---|---|

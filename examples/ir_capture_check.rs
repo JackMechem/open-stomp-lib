@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     for (i, (slot, data)) in uploads.iter().enumerate() {
         let rec = names.get(i);
         let name = rec.map_or("?", |r| r.2.as_str());
-        println!("upload {i}: header slot {slot}, name record slot {:?}, field {:02x?}, name {name:?}", rec.map(|r| r.0), rec.map(|r| r.1));
+        println!("upload {i}: data header slot {slot}, name record slot {:?}, field {:02x?}, name {name:?}", rec.map(|r| r.0), rec.map(|r| r.1));
         let nz: Vec<(usize, f32)> = data.iter().enumerate().filter(|(_, v)| v.abs() > 1e-7).map(|(k, &v)| (k, v)).collect();
         print!("  {} non-zero values; largest at", nz.len());
         let mut big = nz.clone();
@@ -79,6 +79,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             "  file {stem:?} ({} Hz, {} ch, {} samples): app gain {g:.6} ({:+.3} dB); residual after our layout {:.1} dB",
             wav.sample_rate, wav.channels.len(), wav.channels[0].len(), 20.0 * g.abs().log10(), 10.0 * resid.max(1e-15).log10()
         );
+        let err: f64 = c.data.iter().zip(data).map(|(a, b)| (*a as f64 - *b as f64).powi(2)).sum::<f64>()
+            / data.iter().map(|b| (*b as f64).powi(2)).sum::<f64>();
+        let worst = c.data.iter().zip(data).fold(0f64, |m, (a, b)| m.max((a - b).abs() as f64));
+        println!("  ours vs the app: error energy {:.1} dB, largest difference {worst:.2e}", 10.0 * err.max(1e-20).log10());
         println!(
             "  gain × peak(head) {:.5}, × peak(file) {:.5}, × sqrt(energy head) {:.5}, ours {:.6}\n",
             g * peak, g * file_peak, g * energy.sqrt(), c.gain

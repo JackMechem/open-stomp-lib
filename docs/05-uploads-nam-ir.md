@@ -270,29 +270,36 @@ pedal's fixed `f`.
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
 ```
-→ B1 3B 02, B1 02 1E            app selects CAB page + USER IR 01 (model 30)
+→ B1 02 1E+slot                 app selects the slot's cab model (USER IR 01 = 30); it may show the CAB page first (B1 3B 02)
 → 70 10 01 <data, sub 0, offset, total 8192>   ×61, each ← 70 10 03 <header> ack
-→ 70 09 01 <slot> <packed: 01 00 00 00, 32-byte name "Delay And Reverb">   ← (CC 0x7E 00) + 70 09 03 00…
+→ 70 09 01 <slot> <packed: 01 00 00 00, 32-byte name>   ← (CC 0x7E 00) + 70 09 03 00…
 ```
 
-Data header: the same layout as NAM, with sub-command 0. Only slot 0 was captured; the slot is assumed to sit in header
-byte 1 as for NAM. The `0x09` record is a 4-byte field (`01 00 00 00` after an upload, meaning unknown) and a 32-byte
-name. Note: in the capture this upload sits *just before* the `IR import 'delay and reverb'` marker (the "just
-before" markers were typed after the action).
+Data header: the same layout as NAM, but the slot is in **header byte 0** (byte 1, NAM's slot byte, is 0) and the
+sub-command is 0. The `0x09` record is a 4-byte field (`01 00 00 00` in every import seen, eleven of them) and a 32-byte
+name: the file name without its extension, **cut to 16 characters**. Checked byte for byte against imports into all ten
+slots (`captures/logs/02-ir-tests.log`, `tests/ir_import.rs`).
 
-### What the 2048 floats are
+### What the 2048 floats are (the official converter, 2026-10)
 
-* The app converts any audio file to a 48 kHz WAV first (JUCE in `nux_plugins`: `convertAudioToWaveFormat` writes
-  `*_ir_48.wav` / `*_t_ir_48.wav`, `loadAudioFileData` reads it back to the Dart side).
-* **The upload is the first 2048 samples of that 48 kHz IR, time-reversed, times a gain** (2026-10): `data[2047 − k] =
-  g · ir[k]`, the same reversed layout as the NAM filters. Checked on the one captured upload (`examples/ir_check`):
-  reversed, with no offset, it matches "Delay And Reverb Ambient Shoegaze Machine percussive verb 1.wav" exactly
-  (residual −120 dB, float rounding), so that is the file that was imported. No trimming, windowing or
-  minimum-phase conversion.
-* **The gain rule is not known yet.** Here `g` = 12.5344 (+21.96 dB). It is not 1/peak (of the 2048 samples or the
-  file), 1/rms or unit energy over 1024/2000/2048/4096/8192 samples or the whole file, 1/Σ|x|, nor 0 dB at a fixed
-  frequency. Unit energy over the 2048 uploaded samples comes closest (0.36 dB low). The rule is probably in the
-  app's Dart code (the IR flow lives in `App.framework`); a second capture with a designed IR (e.g. two impulses of
-  known amplitude) would settle it.
+Recovered from the app's native code (`nux_plugins`: `JuceUtil::convertAudioToWaveFormat`, decompiled with Ghidra)
+and confirmed on eleven captured imports: ten designed test IRs (`tests/data/ir`, `examples/ir_test_files`) and a
+real reverb IR. `ir::convert` reproduces all of them (eight bit for bit, the rest within float rounding,
+`examples/ir_capture_check`).
 
-Vector: `captures/files/ir/IR01.device_floats.bin` (log marker `imported Jcm800`, cmd 0x10, sub 0). The imported file was the "percussive verb 1" WAV (above).
+1. **Normalise the file.** Unless it is already a 48 kHz mono 24-bit WAV, it is converted to one: JUCE's
+   `ResamplingAudioSource` (`samplesIn/samplesOut = rate / 48000`) writes `⌊len · 48000 / rate⌋` samples of the
+   **first channel** to a 24-bit WAV (`*_ir_48.wav`). The resampler is linear interpolation (single precision) plus
+   JUCE's 2nd-order low-pass at the lower Nyquist frequency, applied to the input when downsampling and to the output
+   when upsampling (not at all within ±0.01 % of 1:1). 24-bit: `round(x · 8388607)`, read back as `/ 8388608`.
+2. **Take the first 2048 samples** (zero-padded), **time-reversed**: `data[2047 − k] = g · ir[k]`, the same layout
+   as the NAM filters. No trimming, windowing or minimum-phase conversion.
+3. **Gain.** The app's `NuxFFT` (16384 points) transforms the 2048 samples (as the impulse response of the FIR they
+   form) and scans bins 136–1023, **398 Hz – 3 kHz**, for the smallest and largest magnitude:
+   `g = 1 / √(max |X| · min |X|)`, so the band's peak and trough end up symmetric about 0 dB. A single impulse
+   becomes exactly 1.0.
+
+`convertAudioToWavWithOut` writes 2048 floats back out reversed as a 24-bit WAV (an export, not part of the import).
+
+The first capture (`captures/files/ir/IR01.device_floats.bin`, log marker `imported Jcm800`) was the "percussive verb 1"
+WAV: gain 12.5344, reproduced to −138 dB.

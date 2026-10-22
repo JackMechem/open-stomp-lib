@@ -16,7 +16,7 @@ pub fn err(e: Box<dyn std::error::Error + Send + Sync>) -> PyErr {
 pub struct ConvertedIr {
     /// The 2048 floats to upload (reversed, scaled).
     data: Vec<f32>,
-    /// The gain applied (provisional, see docs/09).
+    /// The gain applied.
     gain: f32,
     /// The IR at 48 kHz (first channel), before truncation.
     ir: Vec<f32>,
@@ -46,20 +46,22 @@ fn load_wav(path: std::path::PathBuf) -> PyResult<(u32, Vec<Vec<f32>>)> {
 #[pyfunction]
 #[pyo3(signature = (path, sample_rate, channels, float = false))]
 fn save_wav(path: std::path::PathBuf, sample_rate: u32, channels: Vec<Vec<f32>>, float: bool) -> PyResult<()> {
-    let bytes = i::Wav { sample_rate, channels }.to_bytes(if float { 32 } else { 24 }, float);
+    let bytes = i::Wav::new(sample_rate, channels).to_bytes(if float { 32 } else { 24 }, float);
     std::fs::write(path, bytes).map_err(|e| PyOSError::new_err(e.to_string()))
 }
 
-/// Convert an IR WAV file (any sample rate; first channel) like the official app.
+/// Convert an IR WAV file (any sample rate; first channel) exactly like the official app.
 #[pyfunction]
 fn convert(path: std::path::PathBuf) -> PyResult<ConvertedIr> {
     Ok(i::convert(&i::Wav::load(path).map_err(err)?).into())
 }
 
-/// Resample samples from `src` Hz to `dst` Hz (windowed sinc).
+/// Resample samples from `src` Hz to `dst` Hz (windowed sinc; `like_app=True`: the official app's
+/// JUCE resampler).
 #[pyfunction]
-fn resample(samples: Vec<f32>, src: u32, dst: u32) -> Vec<f32> {
-    i::resample(&samples, src, dst)
+#[pyo3(signature = (samples, src, dst, like_app = false))]
+fn resample(samples: Vec<f32>, src: u32, dst: u32, like_app: bool) -> Vec<f32> {
+    if like_app { i::resample_like_app(&samples, src, dst) } else { i::resample(&samples, src, dst) }
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -291,9 +291,9 @@ dev.import_ir_file(0, "My Cab.wav")?;             // convert + upload to USER IR
 ```
 
 Or step by step: `ir::Wav::load(path)?`, `ir::convert(&wav)` (first channel, resampled to 48 kHz, the first 2048
-samples reversed and scaled), then `dev.import_user_ir(slot, name, &c.data)`. This follows the official app's
-conversion, except that the app's gain rule isn't known yet, so the level may differ by a dB or so
-([09](09-open-questions.md)). `ir::resample` and `Wav::to_bytes` are there for your own processing.
+samples reversed and scaled), then `dev.import_user_ir(slot, name, &c.data)`. This is the official app's conversion,
+recovered from its code and identical to its uploads ([05](05-uploads-nam-ir.md)). `ir::resample` (windowed sinc),
+`ir::resample_like_app` and `Wav::to_bytes` are there for your own processing.
 
 ### Uploading a user AMP or IR
 

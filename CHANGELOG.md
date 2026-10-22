@@ -7,13 +7,17 @@ All notable changes to `open-stomp`. The format follows
 ## [Unreleased]
 
 ### Added
-- `ir` module: read and write WAV files (`Wav`: PCM 8–32-bit and float, any channel count), a windowed-sinc
-  `resample`, and `convert`, the official app's IR conversion: the first 2048 samples of the IR at 48 kHz,
-  time-reversed, times a gain. The layout matches a captured import exactly; the app's gain rule is still open, so the
-  gain is provisional (unit energy over the uploaded samples). `Device::import_ir_file(slot, path)` converts and
-  uploads, named after the file like the app (first 16 characters). Python: `open_stomp.ir`,
-  `Device.import_ir_file`. Examples `ir_check` (compare upload data with IR files) and `ir_test_files` (designed IRs
-  for pinning down the rest, `tests/data/ir`).
+- `ir` module: read and write WAV files (`Wav`: PCM 8–32-bit and float, any channel count), and `convert`, the
+  official app's IR conversion recovered from its native code: files that aren't 48 kHz mono 24-bit are converted
+  first (first channel, JUCE's resampler, `resample_like_app`, 24-bit), then the first 2048 samples are reversed and
+  scaled so the 398 Hz – 3 kHz response is centred on 0 dB (`app_gain`). Identical to eleven captured imports
+  (`tests/ir_import.rs`). `Device::import_ir_file(slot, path)` converts and uploads, named like the app (first 16
+  characters). Also a windowed-sinc `resample`. Python: `open_stomp.ir`, `Device.import_ir_file`. Examples
+  `ir_check`, `ir_test_files` (designed test IRs, `tests/data/ir`) and `ir_capture_check`.
+
+### Fixed
+- User IR uploads put the slot in data-header byte 0, as the official app does (it was in byte 1, NAM's slot byte,
+  so only slot 0 was right). `upload::Chunk::ir_slot`; `Reassembler` reports either slot.
 
 ## [0.3.0] - 2026-10-21
 

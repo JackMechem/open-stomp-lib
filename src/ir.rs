@@ -1,9 +1,10 @@
 //! Impulse responses for the pedal's user CAB (IR) slots (docs/05): reading and writing WAV files,
 //! resampling, and the conversion to the pedal's upload format.
 //!
-//! The official app uploads the first [`IR_TAPS`] samples of the IR at 48 kHz, time-reversed, times a
-//! gain. [`convert`] does the same; the app's gain rule is not known yet, so the gain here
-//! (unit energy over the uploaded samples) is provisional and may differ by a dB or so (docs/09).
+//! [`convert`] is the official app's IR conversion, recovered from its native code (docs/05) and
+//! matching its uploads exactly: a file that isn't a 48 kHz mono 24-bit WAV is first converted to
+//! one (first channel, JUCE's resampler, 24-bit); the first [`IR_TAPS`] samples are time-reversed and
+//! scaled so that the response between 398 Hz and 3 kHz is centred on 0 dB.
 //! The upload itself is [`crate::upload::user_ir_upload`] / `Device::import_user_ir`.
 
 use std::fmt;
@@ -13,6 +14,24 @@ use std::fmt;
 pub struct Wav {
     pub sample_rate: u32,
     pub channels: Vec<Vec<f32>>,
+    /// How the file stored its samples (the official app converts anything but 24-bit PCM).
+    pub encoding: Encoding,
+}
+
+/// Sample encoding of a WAV file.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Encoding {
+    /// Integer PCM with this many bits.
+    Pcm(u16),
+    /// IEEE float with this many bits.
+    Float(u16),
+}
+
+impl Wav {
+    /// In-memory audio (32-bit float, like a float WAV file).
+    pub fn new(sample_rate: u32, channels: Vec<Vec<f32>>) -> Wav {
+        Wav { sample_rate, channels, encoding: Encoding::Float(32) }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -102,7 +121,8 @@ impl Wav {
                 out[c].push(decode(s));
             }
         }
-        Ok(Wav { sample_rate, channels: out })
+        let encoding = if tag == FLOAT { Encoding::Float(bits as u16) } else { Encoding::Pcm(bits as u16) };
+        Ok(Wav { sample_rate, channels: out, encoding })
     }
 
     pub fn load(path: impl AsRef<std::path::Path>) -> Result<Wav, Box<dyn std::error::Error + Send + Sync>> {
@@ -210,24 +230,117 @@ pub struct ConvertedIr {
     pub data: Vec<f32>,
     /// The gain applied.
     pub gain: f32,
-    /// The IR at 48 kHz (the file's first channel, resampled if needed), before truncation.
+    /// The IR at 48 kHz as the app sees it (after its conversion), before truncation.
     pub ir: Vec<f32>,
 }
 
-/// Convert an IR the way the official app does: first channel, resampled to 48 kHz, the first
-/// [`IR_TAPS`] samples (zero-padded), time-reversed, times a gain. The gain is provisional (unit
-/// energy over the uploaded samples; the app's rule is not known yet, docs/09).
+/// JUCE's `ResamplingAudioSource` low-pass (`createLowPass`): a 2nd-order Butterworth-style
+/// section at the lower Nyquist frequency, as `(b0, b1, b2, a1, a2)`.
+fn juce_low_pass(ratio: f64) -> [f64; 5] {
+    let rate = if ratio > 1.0 { 0.5 / ratio } else { 0.5 * ratio };
+    let n = 1.0 / (std::f64::consts::PI * rate.max(0.001)).tan();
+    let n2 = n * n;
+    let c1 = 1.0 / (1.0 + std::f64::consts::SQRT_2 * n + n2);
+    [c1, c1 * 2.0, c1, c1 * 2.0 * (1.0 - n2), c1 * (1.0 - std::f64::consts::SQRT_2 * n + n2)]
+}
+
+/// JUCE's `applyFilter`: in place, double-precision state, float samples.
+fn juce_filter(x: &mut [f32], c: &[f64; 5]) {
+    let (mut x1, mut x2, mut y1, mut y2) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
+    for v in x {
+        let i = *v as f64;
+        let o = c[0] * i + c[1] * x1 + c[2] * x2 - c[3] * y1 - c[4] * y2;
+        (x2, x1, y2, y1) = (x1, i, y1, o);
+        *v = o as f32;
+    }
+}
+
+/// Resample like the official app: JUCE's `ResamplingAudioSource` (linear interpolation, with its
+/// low-pass applied to the input when downsampling and to the output when upsampling, none
+/// within ±0.01 % of 1:1), writing `⌊len · to / from⌋` samples.
+pub fn resample_like_app(x: &[f32], from: u32, to: u32) -> Vec<f32> {
+    let ratio = from as f64 / to as f64; // input samples per output sample
+    let out_len = (x.len() as f64 / ratio) as usize;
+    let filter = juce_low_pass(ratio);
+    // the input as the interpolator sees it (zeros past the end, filtered too when downsampling)
+    let mut src: Vec<f32> = x.to_vec();
+    src.resize(x.len().max((out_len as f64 * ratio) as usize + 4), 0.0);
+    if ratio > 1.0001 {
+        juce_filter(&mut src, &filter);
+    }
+    let (mut pos, mut sub) = (0usize, 0.0f64);
+    let mut out = Vec::with_capacity(out_len);
+    for _ in 0..out_len {
+        let alpha = sub as f32;
+        let (a, b) = (src.get(pos).copied().unwrap_or(0.0), src.get(pos + 1).copied().unwrap_or(0.0));
+        out.push(a + alpha * (b - a));
+        sub += ratio;
+        while sub >= 1.0 {
+            pos += 1;
+            sub -= 1.0;
+        }
+    }
+    if ratio < 0.9999 {
+        juce_filter(&mut out, &filter);
+    }
+    out
+}
+
+/// Write to and read back from a 24-bit WAV the way JUCE does (`× 8388607`, rounded, `÷ 8388608`).
+fn via_24_bit(x: &mut [f32]) {
+    for v in x {
+        let q = ((*v as f64).clamp(-1.0, 1.0) * 8_388_607.0).round_ties_even().clamp(-8_388_608.0, 8_388_607.0);
+        *v = (q / 8_388_608.0) as f32;
+    }
+}
+
+/// FFT length and bins of the app's gain measurement: 16384 points, bins 136–1023 (398 Hz – 3 kHz).
+const GAIN_FFT: usize = 16384;
+const GAIN_BINS: std::ops::Range<usize> = 136..1024;
+
+/// The app's gain: `1 / √(max |X| · min |X|)` over bins 136–1023 of the 16384-point spectrum of
+/// the first [`IR_TAPS`] samples, i.e. the band's peak and trough end up symmetric about 0 dB.
+pub fn app_gain(head: &[f32]) -> f64 {
+    let n = GAIN_FFT as f64;
+    // a direct DFT over the 888 bins (no FFT dependency; a few ms)
+    let (mut lo, mut hi) = (f64::MAX, 0f64);
+    for k in GAIN_BINS {
+        let w = std::f64::consts::TAU * k as f64 / n;
+        let (c, s) = (w.cos(), w.sin());
+        let (mut re, mut im, mut cr, mut ci) = (0.0, 0.0, 1.0f64, 0.0f64);
+        for &v in head.iter().take(IR_TAPS) {
+            re += v as f64 * cr;
+            im -= v as f64 * ci;
+            (cr, ci) = (cr * c - ci * s, cr * s + ci * c);
+        }
+        let p = re * re + im * im;
+        (lo, hi) = (lo.min(p), hi.max(p));
+    }
+    if lo > 0.0 && hi.is_finite() { 1.0 / (lo.sqrt() * hi.sqrt()).sqrt() } else { 1.0 }
+}
+
+/// Convert an IR exactly as the official app does (docs/05):
+/// 1. unless the file is a 48 kHz mono 24-bit WAV, convert it to one: the first channel, resampled
+///    with JUCE's `ResamplingAudioSource` ([`resample_like_app`]), stored as 24-bit;
+/// 2. take the first [`IR_TAPS`] samples (zero-padded), time-reversed;
+/// 3. scale by [`app_gain`].
 pub fn convert(wav: &Wav) -> ConvertedIr {
     let ch = wav.channels.first().map(Vec::as_slice).unwrap_or(&[]);
-    let ir = resample(ch, wav.sample_rate, IR_SAMPLE_RATE);
+    let direct = wav.sample_rate == IR_SAMPLE_RATE && wav.channels.len() == 1 && wav.encoding == Encoding::Pcm(24);
+    let ir = if direct {
+        ch.to_vec()
+    } else {
+        let mut v = resample_like_app(ch, wav.sample_rate, IR_SAMPLE_RATE);
+        via_24_bit(&mut v);
+        v
+    };
     let head = &ir[..ir.len().min(IR_TAPS)];
-    let energy: f64 = head.iter().map(|&v| v as f64 * v as f64).sum();
-    let gain = if energy > 0.0 { (1.0 / energy.sqrt()) as f32 } else { 1.0 };
+    let gain = app_gain(head);
     let mut data = vec![0.0f32; IR_TAPS];
     for (k, &v) in head.iter().enumerate() {
-        data[IR_TAPS - 1 - k] = v * gain;
+        data[IR_TAPS - 1 - k] = (gain * v as f64) as f32;
     }
-    ConvertedIr { data, gain, ir }
+    ConvertedIr { data, gain: gain as f32, ir }
 }
 
 /// The slot name the official app gives an imported IR: the file name without its extension, cut
@@ -271,9 +384,9 @@ mod tests {
 
     #[test]
     fn write_and_read_back() {
-        let w = Wav { sample_rate: 44100, channels: vec![vec![0.5, -0.25, 0.0], vec![0.125, 1.0 - 1.0 / 8_388_608.0, -1.0]] };
-        for (bits, float) in [(24, false), (32, true)] {
-            assert_eq!(Wav::parse(&w.to_bytes(bits, float)).unwrap(), w);
+        let w = Wav::new(44100, vec![vec![0.5, -0.25, 0.0], vec![0.125, 1.0 - 1.0 / 8_388_608.0, -1.0]]);
+        for (bits, float, enc) in [(24, false, Encoding::Pcm(24)), (32, true, Encoding::Float(32))] {
+            assert_eq!(Wav::parse(&w.to_bytes(bits, float)).unwrap(), Wav { encoding: enc, ..w.clone() });
         }
         let r = Wav::parse(&w.to_bytes(16, false)).unwrap();
         assert!(r.channels[0].iter().zip(&w.channels[0]).all(|(a, b)| (a - b).abs() < 1e-4));
@@ -297,17 +410,38 @@ mod tests {
     #[test]
     fn conversion_layout() {
         let mut ch = vec![0.0f32; 3000];
-        (ch[0], ch[10], ch[2500]) = (0.3, -0.4, 0.9);
-        let c = convert(&Wav { sample_rate: 48000, channels: vec![ch, vec![1.0; 3000]] });
+        (ch[0], ch[2500]) = (0.25, 0.9);
+        let mut w = Wav::new(48000, vec![ch, vec![1.0; 3000]]);
+        let c = convert(&w);
         assert_eq!(c.data.len(), IR_TAPS);
-        // reversed, first channel only, nothing past IR_TAPS, unit energy
-        assert!((c.data[IR_TAPS - 1] - 0.6).abs() < 1e-6 && (c.data[IR_TAPS - 11] + 0.8).abs() < 1e-6);
-        assert!((c.gain - 2.0).abs() < 1e-6);
-        assert_eq!(c.data.iter().filter(|v| **v != 0.0).count(), 2);
-        // short IRs are zero-padded
-        let s = convert(&Wav { sample_rate: 48000, channels: vec![vec![0.5]] });
-        assert_eq!((s.data[IR_TAPS - 1], s.data[0]), (1.0, 0.0));
+        // first channel, reversed, nothing past IR_TAPS; a lone impulse is scaled to 1
+        assert!((c.data[IR_TAPS - 1] - 1.0).abs() < 1e-6 && (c.gain - 4.0).abs() < 1e-5);
+        assert_eq!(c.data.iter().filter(|v| **v != 0.0).count(), 1);
+        // short IRs are zero-padded; a 48 kHz mono 24-bit file is used as is
+        w = Wav { sample_rate: 48000, channels: vec![vec![-0.5]], encoding: Encoding::Pcm(24) };
+        let s = convert(&w);
+        assert_eq!((s.data[IR_TAPS - 1], s.data[0], s.ir.len()), (-1.0, 0.0, 1));
         assert_eq!(slot_name(std::path::Path::new("/x/Delay And Reverb Ambient.wav")), "Delay And Reverb");
+    }
+
+    #[test]
+    fn app_gain_centres_the_mid_band() {
+        // two impulses whose response swings between about 0.75 and 0.25 across the band
+        // (≈ 1/√(0.75·0.25)); 2.309391 is what the official app applied to this IR
+        let mut x = vec![0.0f32; 2048];
+        (x[0], x[1000]) = (0.5, -0.25);
+        assert!((app_gain(&x) / 2.309391 - 1.0).abs() < 1e-6, "{}", app_gain(&x));
+    }
+
+    #[test]
+    fn app_resampler_basics() {
+        // 1:1 is a copy; the output length is ⌊len · to / from⌋
+        let x: Vec<f32> = (0..100).map(|i| (i as f32 * 0.1).sin()).collect();
+        assert_eq!(resample_like_app(&x, 48000, 48000), x);
+        assert_eq!((resample_like_app(&x, 44100, 48000).len(), resample_like_app(&x, 96000, 48000).len()), (108, 50));
+        // DC passes the low-pass at unity gain
+        let dc = resample_like_app(&[0.5; 4000], 44100, 48000);
+        assert!((dc[3000] - 0.5).abs() < 1e-4);
     }
 
     #[test]
