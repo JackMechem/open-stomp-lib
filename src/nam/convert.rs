@@ -361,9 +361,10 @@ pub fn convert_optimised(model: &mut Model, bla_x: &[f32], on_step: &mut dyn FnM
 }
 
 /// The common output level imports are normalised to ([`normalise_level`]): the pedal's output, in
-/// dB re full scale, for pink noise at −18 dBFS into the pedal (the re-amp rig's units).
-/// Provisional until calibrated against the pedal's built-in amps.
-pub const NORMALISED_LEVEL_DB: f64 = -30.0;
+/// dB re full scale, for pink noise at −18 dBFS into the pedal (the re-amp rig's units). Calibrated
+/// on the pedal so normalised imports play at the level of its built-in bass amps (Ampug SV Bass,
+/// Mes 400 Bass) with the same knobs (re-amped, `tools/pedalsim/nam_level_rig.py`).
+pub const NORMALISED_LEVEL_DB: f64 = -32.5;
 
 /// The pedal's output level for `model` with the optimiser's input/output calibration, in dB, for
 /// pink noise at −18 dBFS: what an upload that matches the model plays at (resets the model).

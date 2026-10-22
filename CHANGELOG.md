@@ -8,8 +8,9 @@ All notable changes to `open-stomp`. The format follows
 
 ### Added
 - NAM import level normalisation, like NAM plugins: `nam::convert::normalise_level` scales G2 (after the pedal's
-  saturation, so a pure volume change) so that every model plays at the same level, `NORMALISED_LEVEL_DB`
-  (provisional), measured with `pedal_level_db` on pink noise. Models span about 17 dB raw; the conversions inherit
+  saturation, so a pure volume change) so that every model plays at the same level, `NORMALISED_LEVEL_DB`,
+  measured with `pedal_level_db` on pink noise and calibrated on the pedal to its built-in bass amps (two SVT-VR
+  models 6 dB apart raw land within 0.2 dB of each other; un-normalised they sat 13–19 dB below the built-in amps). Models span about 17 dB raw; the conversions inherit
   the official app's level, which plays models quietly (24–34 dB below their own output). On by default for
   `Device::import_nam_file`; `Device::import_nam_file_as(.., normalise)`, Python `nam.convert(..., normalise=True)`
   and `Device.import_nam_file(..., normalise=...)`. `nam::Model::loudness` (the file's metadata). Example

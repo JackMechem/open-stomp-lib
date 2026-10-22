@@ -60,7 +60,7 @@ app re-reads the slot info, which comes back as an empty slot.
 | 0–31 | Name, ASCII, zero-padded (the app sends the file name without `.nam`, up to 31 characters) |
 | 32–35 | `u32` = 256 in every record seen (empty or imported) |
 | 36–51 | 0 |
-| 52–55 | `f32` **factor**: 1.0 in both captured imports (FNDR, Jcm800). Probably the `factor` of the converter callback |
+| 52–55 | `f32` **factor**: 1.0 in every import (the converter's `factor` output, a constant). Not an output gain: an upload with factor 2.0 plays at exactly the same level (re-amped, 2026-10) |
 | 56–95 | 0 after an import; an empty slot reads back with `1.0` in each of the ten floats 56–95 too |
 | 96–127 | 0 |
 
@@ -311,6 +311,16 @@ level is about unity (an impulse of 1.0 at tap 0 measures −0.1 … −0.8 dB a
 
 So the official conversion's last 1664 samples are never heard, and its gain is computed on a response the pedal
 doesn't play. Like the NAM filters' 512-tap limit, this leaves room for a better conversion of long IRs.
+
+### Import level
+
+The official conversion plays models at their own captured level scaled down a lot: on the pedal, 24–34 dB below the
+model's own output for the same input, so imports sit well below the built-in amps (13–19 dB for the SVT-VR models
+tested) and need the AMP block's gain and master turned up. NAM plugins instead normalise every model to one level.
+`nam::convert::normalise_level` does the same: it measures what the pedal would play for the model (pink noise at
+−18 dBFS, the optimiser's calibration) and scales G2 to `NORMALISED_LEVEL_DB`. G2 comes after the pedal's saturation,
+so this changes only the volume. Calibrated on the pedal: normalised imports play at the level of the built-in Ampug
+SV Bass and Mes 400 Bass with the same knobs, and two models 6 dB apart raw land within 0.2 dB of each other.
 
 ### Optimised IR conversion
 
