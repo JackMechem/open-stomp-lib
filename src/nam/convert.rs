@@ -228,17 +228,12 @@ fn find_official(bytes: &[u8]) -> Option<Vec<f32>> {
     let len = N * 4;
     let mut i = 0;
     while i + len <= bytes.len() {
-        match bytes[i..bytes.len() - len + OFFICIAL_PREFIX.len()].windows(8).position(|w| w == OFFICIAL_PREFIX) {
-            None => return None,
-            Some(p) => {
-                let at = i + p;
-                let table = &bytes[at..at + len];
-                if fnv1a64(table) == OFFICIAL_FNV1A64 {
-                    return Some(table.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().expect("4"))).collect());
-                }
-                i = at + 1;
-            }
+        let at = i + bytes[i..bytes.len() - len + OFFICIAL_PREFIX.len()].windows(8).position(|w| w == OFFICIAL_PREFIX)?;
+        let table = &bytes[at..at + len];
+        if fnv1a64(table) == OFFICIAL_FNV1A64 {
+            return Some(table.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect());
         }
+        i = at + 1;
     }
     None
 }

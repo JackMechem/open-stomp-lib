@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut m = Model::load(model)?;
     println!("{} ({}), {:?} Hz", m.name.as_deref().unwrap_or("?"), m.architecture, m.sample_rate());
     let data = std::fs::read(log)?;
-    let f32s = |b: &[u8]| b.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect::<Vec<_>>();
+    let f32s = |b: &[u8]| b.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect::<Vec<_>>();
     let (mut pos, mut call, mut worst) = (0, 0, 0f32);
     let t0 = std::time::Instant::now();
     while pos < data.len() {

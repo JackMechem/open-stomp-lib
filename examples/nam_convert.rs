@@ -15,7 +15,7 @@
 use open_stomp::nam::{Model, convert};
 
 fn read_f32(path: &std::path::Path) -> std::io::Result<Vec<f32>> {
-    Ok(std::fs::read(path)?.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect())
+    Ok(std::fs::read(path)?.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect())
 }
 
 /// 1/3-octave band levels (dB) of a 1024-tap filter stored reversed, 50 Hz – 16 kHz.

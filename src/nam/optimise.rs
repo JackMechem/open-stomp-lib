@@ -917,8 +917,10 @@ mod tests {
         let p = format!("{}/tests/data/optim/{name}.bin", env!("CARGO_MANIFEST_DIR"));
         std::fs::read(&p)
             .unwrap_or_else(|e| panic!("{p}: {e}"))
-            .chunks_exact(8)
-            .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+            .as_chunks::<8>()
+            .0
+            .iter()
+            .map(|c| f64::from_le_bytes(*c))
             .collect()
     }
 

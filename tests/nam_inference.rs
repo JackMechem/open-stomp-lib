@@ -4,7 +4,7 @@
 use open_stomp::nam::Model;
 
 fn f32s(path: &str) -> Vec<f32> {
-    std::fs::read(path).expect(path).chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect()
+    std::fs::read(path).expect(path).as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect()
 }
 
 fn check(name: &str) {

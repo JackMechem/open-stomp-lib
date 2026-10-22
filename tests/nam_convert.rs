@@ -74,7 +74,7 @@ fn matches_official_app_when_dumps_available() {
         return;
     };
     let f32s = |p: std::path::PathBuf| -> Vec<f32> {
-        std::fs::read(&p).unwrap_or_else(|_| panic!("{p:?}")).chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect()
+        std::fs::read(&p).unwrap_or_else(|_| panic!("{p:?}")).as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect()
     };
     for entry in std::fs::read_dir(&root).unwrap() {
         let path = entry.unwrap().path();
