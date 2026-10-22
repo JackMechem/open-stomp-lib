@@ -265,7 +265,7 @@ let x = convert::official_excitation("/Applications/Stomp Manager.app")?; // or 
 let c = convert::convert_with(&mut model, &x);                          // = the official conversion
 ```
 
-`dev.import_nam_file` does this automatically when the app is installed in a standard location.
+This is opt-in; `dev.import_nam_file` never reads the official app.
 
 ### Uploading a user AMP or IR
 

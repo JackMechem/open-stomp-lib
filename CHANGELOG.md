@@ -24,8 +24,8 @@ All notable changes to `open-stomp`. The format follows
 - `nam::convert::official_excitation` / `find_official_excitation`: read the official app's test
   signal from the user's own Stomp Manager install (located by fingerprint; no vendor data in the
   source). With it the conversion equals the official one (error energy −51 to −93 dB on ten
-  models). `Device::import_nam_file` uses it automatically when the app is installed. Python:
-  `nam.official_excitation()`.
+  models). Strictly opt-in: `Device::import_nam_file` and everything else never read the app.
+  Python: `nam.official_excitation()`.
 - `upload` module: user AMP (NAM, SysEx `0x58`) and user IR (`0x10` + `0x09`) upload framing:
   chunking, the 128-byte slot-info record (`UserAmpInfo`: name, factor), delete, and a
   `Reassembler` that turns captured chunks back into floats. Every captured import rebuilds

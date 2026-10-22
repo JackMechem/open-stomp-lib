@@ -201,9 +201,10 @@ energy −0.2 to −31 dB vs the app's upload, the same spread as ours), so only
 results. `BLA_x` can't be regenerated (it isn't `rand()`-derived) and is vendor data, so it isn't shipped:
 `nam::convert::official_excitation(path)` reads it from the user's own copy of Stomp Manager (the `.app` bundle,
 the Windows install folder or the library file; nothing is executed, the table is found by an 8-byte prefix and a
-64-bit hash), and `find_official_excitation()` tries the standard install locations. `Device::import_nam_file`
-uses it automatically when found, so with the app installed, imports match the official app exactly (verified
-on ten models: error energy −51 to −93 dB vs the app's uploads). It works on any OS with a downloaded copy of
+64-bit hash), and `find_official_excitation()` tries the standard install locations. This is strictly opt-in:
+nothing in open-stomp reads the app by itself (`Device::import_nam_file` always uses our own converter). With it,
+conversions match the official app exactly (verified on ten models: error energy −51 to −93 dB vs the app's
+uploads). It works on any OS with a downloaded copy of
 the app; the Windows build's table is assumed identical (not checked).
 
 ## User IR — SysEx `0x10` (data) + `0x09` (name)

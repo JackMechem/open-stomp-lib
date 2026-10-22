@@ -189,7 +189,7 @@ out = model.process(samples)                  # run the network on your own audi
 
 For an exact match with the official app, pass its own test signal, read from an installed Stomp Manager:
 `nam.convert(model, excitation=nam.official_excitation())` (or `official_excitation("/path/to/Stomp Manager.app")`).
-`dev.import_nam_file` does this automatically when the app is installed in a standard location.
+This is opt-in; `dev.import_nam_file` never reads the official app.
 
 `Converted` also has every intermediate stage (`levels`, `levels3`, `bla_db`, `g1_gains_db`, `g1_ir`, `g2_ir`).
 
