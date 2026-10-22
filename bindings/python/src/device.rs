@@ -388,9 +388,10 @@ impl Device {
     }
 
     /// Convert an IR WAV file and import it into user IR `slot` (0–9), named after the file
-    /// (first 16 characters) like the official app. `method` as for `ir.convert`. Returns the
+    /// (first 16 characters) like the official app. `method`: `"optimised"` (default, closest to
+    /// the real IR on the pedal) or `"app"` (exactly the official conversion). Returns the
     /// conversion.
-    #[pyo3(signature = (slot, path, method = "app"))]
+    #[pyo3(signature = (slot, path, method = "optimised"))]
     fn import_ir_file(&self, slot: u8, path: std::path::PathBuf, method: &str) -> PyResult<crate::ir::ConvertedIr> {
         let method = crate::ir::parse_method(method)?;
         let g = self.lock();

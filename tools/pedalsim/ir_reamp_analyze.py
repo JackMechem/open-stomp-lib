@@ -1,6 +1,6 @@
 """What the pedal does with a user IR: the CAB block's measured impulse response (sweep deconvolution,
 divided by the dry rig path) against what was uploaded.
-usage: ir_reamp_analyze.py <dir from ir_reamp_prep + reamp_run> [DRY PROBE VERB]
+usage: ir_reamp_analyze.py <dir from ir_reamp_prep + reamp_run> [DRY RUN ...]   (the first run is the dry reference)
 """
 import json, sys
 from pathlib import Path
@@ -35,7 +35,7 @@ runs = {n: on_timeline(np.load(D / f"{n}.npy").astype(np.float64)) for n in name
 prep = json.load(open(D / "ir_prep.json"))
 N = 1 << 14
 for seg in ("sweep -24", "sweep -12"):
-    hd, kd = response(runs["DRY"], seg)
+    hd, kd = response(runs[names[0]], seg)   # the first run is the dry reference
     print(f"\n== {seg}: dry peak at {kd}")
     Hd = np.fft.rfft(hd[kd - 1000: kd - 1000 + N])
     for n in names[1:]:

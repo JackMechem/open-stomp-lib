@@ -305,15 +305,22 @@ impl Device {
         Ok(())
     }
 
-    /// Convert an IR audio file ([`crate::ir::convert`]: WAV, any sample rate) and import it into
-    /// user IR `slot` (0–9), named after the file like the official app does (first 16
-    /// characters). Returns the conversion, identical to the official app's.
+    /// Convert an IR audio file (WAV, any sample rate) with the best conversion,
+    /// [`crate::ir::convert_optimised`] (a 384-tap filter fitted to the whole IR: the pedal only
+    /// plays 384 taps, so this is much closer to the real IR than the official app's), and import
+    /// it into user IR `slot` (0–9), named after the file like the official app does (first 16
+    /// characters). [`Device::import_ir_file_with`] with `Method::App` gives exactly the official
+    /// conversion. Returns the conversion.
     pub fn import_ir_file(
         &self,
         slot: u8,
         path: impl AsRef<std::path::Path>,
     ) -> Result<crate::ir::ConvertedIr, Box<dyn std::error::Error + Send + Sync>> {
-        self.import_ir_file_with(slot, path, crate::ir::Method::App)
+        #[cfg(feature = "nam")]
+        let method = crate::ir::Method::Optimised;
+        #[cfg(not(feature = "nam"))]
+        let method = crate::ir::Method::App;
+        self.import_ir_file_with(slot, path, method)
     }
 
     /// [`Device::import_ir_file`] with a choice of conversion ([`crate::ir::Method`]).

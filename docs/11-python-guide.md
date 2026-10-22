@@ -200,7 +200,7 @@ The optimised conversion (the default for `import_nam_file`) fits the filters wi
 ### Importing an IR
 
 ```python
-dev.import_ir_file(0, "My Cab.wav")           # convert + upload to USER IR 01, named "My Cab"
+dev.import_ir_file(0, "My Cab.wav")           # optimised conversion + upload to USER IR 01 ("My Cab")
 
 from open_stomp import ir
 c = ir.convert("My Cab.wav")                  # c.data: the 2048 floats; c.gain, c.ir
@@ -208,8 +208,9 @@ rate, channels = ir.load_wav("My Cab.wav")    # also ir.save_wav, ir.resample
 ```
 
 The conversion is the official app's, recovered from its code and identical to its uploads ([05](05-uploads-nam-ir.md)).
-`method="optimised"` (`ir.convert`, `dev.import_ir_file`) fits the 384 samples the pedal actually plays to the whole IR
-instead, much closer on the pedal for long or delayed IRs ([05](05-uploads-nam-ir.md#optimised-ir-conversion)).
+`method="optimised"` fits the 384 samples the pedal actually plays to the whole IR instead, much closer on the pedal
+for long or delayed IRs ([05](05-uploads-nam-ir.md#optimised-ir-conversion)); it is the default for
+`dev.import_ir_file` (`method="app"` for the official conversion), while `ir.convert` defaults to `"app"`.
 
 ### Uploading a user AMP or IR
 

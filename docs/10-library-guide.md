@@ -287,7 +287,7 @@ re-amp rig's input units).
 ### Importing an IR
 
 ```rust
-dev.import_ir_file(0, "My Cab.wav")?;             // convert + upload to USER IR 01, named "My Cab"
+dev.import_ir_file(0, "My Cab.wav")?;             // optimised conversion + upload to USER IR 01, named "My Cab"
 ```
 
 Or step by step: `ir::Wav::load(path)?`, `ir::convert(&wav)` (first channel, resampled to 48 kHz, the first 2048
@@ -296,8 +296,9 @@ recovered from its code and identical to its uploads ([05](05-uploads-nam-ir.md)
 `ir::resample_like_app` and `Wav::to_bytes` are there for your own processing.
 
 The pedal only plays the first 384 samples (8 ms) of an IR, so long IRs, or IRs that start after a delay, lose a lot
-on the pedal with the app's conversion. `ir::convert_optimised` / `dev.import_ir_file_with(slot, path,
-ir::Method::Optimised)` fits a 384-tap filter to the whole IR instead ([05](05-uploads-nam-ir.md#optimised-ir-conversion)).
+on the pedal with the app's conversion. `ir::convert_optimised` fits a 384-tap filter to the whole IR instead
+([05](05-uploads-nam-ir.md#optimised-ir-conversion)); `dev.import_ir_file` uses it by default, and
+`dev.import_ir_file_with(slot, path, ir::Method::App)` gives exactly the official conversion.
 
 ### Uploading a user AMP or IR
 

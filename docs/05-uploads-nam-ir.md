@@ -335,5 +335,12 @@ the pedal plays against the full IR, 31.5 Hz – 16 kHz, level difference remove
 | 2 × DI recordings that start after 2048 samples | 9.9 – 13.6 dB rms, 34 dB too quiet | 2.8 – 3.3 dB rms |
 | Mean | 7.94 dB | 2.42 dB |
 
+**On hardware** (re-amped, the CAB block alone, measured response against the full IR, same measure): "Ampeg 8x10 57
+AH" official 4.78 dB rms, optimised **2.07 dB** at the same level (+0.3 dB); "Ampeg SVT Neumann" (starts 1030 samples
+in) official 16.0 dB rms and **46 dB too quiet**, optimised **5.47 dB** at the intended level. The recorded responses
+match the uploaded 384 taps (correlation 0.97–0.99, within about 1.5 dB at 32 Hz and 0.6 dB above). The extra error
+against software is mostly the 32 Hz band, which a 384-sample window resolves poorly. `Device::import_ir_file` uses
+the optimised conversion by default.
+
 The first capture (`captures/files/ir/IR01.device_floats.bin`, log marker `imported Jcm800`) was the "percussive verb 1"
 WAV: gain 12.5344, reproduced to −138 dB.

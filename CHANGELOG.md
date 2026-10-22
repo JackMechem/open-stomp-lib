@@ -18,8 +18,9 @@ All notable changes to `open-stomp`. The format follows
 - `ir::convert_optimised` / `Method::Optimised` (feature `nam`): a 384-tap minimum-phase filter fitted to the whole
   IR's 1/6-octave response, at the level the app means to give it. On fifteen bass IRs in software, what the pedal
   plays is 2.4 dB rms from the full IR against 7.9 dB for the official conversion, which leaves IRs with a delayed
-  start 35–44 dB too quiet. `convert_with`, `Device::import_ir_file_with`, Python `method="optimised"`, example
-  `ir_compare`.
+  start 35–44 dB too quiet. Confirmed on hardware (re-amped: 2.1 vs 4.8 dB rms, and 5.5 dB vs 16 dB rms plus 46 dB
+  too quiet for a delayed IR). The default for `Device::import_ir_file` (Python too); `convert_with`,
+  `Device::import_ir_file_with(.., Method::App)` for the official conversion, Python `method=`, example `ir_compare`.
 
 ### Fixed
 - User IR uploads put the slot in data-header byte 0, as the official app does (it was in byte 1, NAM's slot byte,
