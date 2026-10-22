@@ -7,7 +7,7 @@ from audio_io import SR, find, playrec
 from open_stomp import Device, DeviceState, Module
 
 OUT = Path(sys.argv[2]); OUT.mkdir(parents=True, exist_ok=True)
-RUNS = json.loads(sys.argv[3]) if len(sys.argv) > 3 else [["A1", 35], ["B1", 36], ["A2", 35], ["B2", 36]]   # [name, amp model or null = all blocks off]
+RUNS = json.loads(sys.argv[3]) if len(sys.argv) > 3 else [["A1", 35], ["B1", 36], ["A2", 35], ["B2", 36]]   # [name, model or null = all blocks off]; model: AMP model number, or "CAB:39" etc.
 
 def fade(x, n=480):
     x[:n] *= np.linspace(0, 1, n); x[-n:] *= np.linspace(1, 0, n); return x
@@ -54,12 +54,20 @@ with Device() as dev:
     try:
         for m, s in saved.items():
             dev.set_head(m, s.model, False)
+        def spec(model):
+            if isinstance(model, str):
+                mod, num = model.split(":")
+                return getattr(Module, mod), int(num)
+            return Module.AMP, model
         for name, model in RUNS:
             if model is not None:
-                dev.set_head(Module.AMP, model, True)
+                for m, s in saved.items():
+                    dev.set_head(m, s.model, False)
+                mod, num = spec(model)
+                dev.set_head(mod, num, True)
             time.sleep(1.0)
             dev.drain()
-            print(f"run {name}: " + (f"AMP model {model} ({st.model_name(Module.AMP, model)})" if model is not None else "all blocks off (dry)") + " …", flush=True)
+            print(f"run {name}: " + (f"{spec(model)[0]} model {spec(model)[1]} ({st.model_name(*spec(model))})" if model is not None else "all blocks off (dry)") + " …", flush=True)
             rec = playrec(sig, mtrack, pedal, pre=0.5, post=1.0)
             np.save(OUT / f"{name}.npy", rec[:, 0])
             print(f"   recorded {len(rec)/SR:.1f} s, peak {20*np.log10(np.abs(rec[:,0]).max()+1e-12):.1f} dBFS", flush=True)

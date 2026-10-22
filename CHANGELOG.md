@@ -6,6 +6,36 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - Unreleased
+
+### Added
+- NAM import level normalisation, like NAM plugins: `nam::convert::normalise_level` scales G2 (after the pedal's
+  saturation, so a pure volume change) so that every model plays at the same level, `NORMALISED_LEVEL_DB`,
+  measured with `pedal_level_db` on pink noise and calibrated on the pedal to its built-in bass amps (two SVT-VR
+  models 6 dB apart raw land within 0.2 dB of each other; un-normalised they sat 13–19 dB below the built-in amps). Models span about 17 dB raw; the conversions inherit
+  the official app's level, which plays models quietly (24–34 dB below their own output). On by default for
+  `Device::import_nam_file`; `Device::import_nam_file_as(.., normalise)`, Python `nam.convert(..., normalise=True)`
+  and `Device.import_nam_file(..., normalise=...)`. `nam::Model::loudness` (the file's metadata). Example
+  `nam_level`.
+- `ir` module: read and write WAV files (`Wav`: PCM 8–32-bit and float, any channel count), and `convert`, the
+  official app's IR conversion recovered from its native code: files that aren't 48 kHz mono 24-bit are converted
+  first (first channel, JUCE's resampler, `resample_like_app`, 24-bit), then the first 2048 samples are reversed and
+  scaled so the 398 Hz – 3 kHz response is centred on 0 dB (`app_gain`). Identical to eleven captured imports
+  (`tests/ir_import.rs`). `Device::import_ir_file(slot, path)` converts and uploads, named like the app (first 16
+  characters). Also a windowed-sinc `resample`. Python: `open_stomp.ir`, `Device.import_ir_file`. Examples
+  `ir_check`, `ir_test_files` (designed test IRs, `tests/data/ir`) and `ir_capture_check`.
+- The pedal plays only the first 384 taps of an uploaded IR (re-amped probe IRs; `ir::PEDAL_IR_TAPS`, docs/05).
+- `ir::convert_optimised` / `Method::Optimised` (feature `nam`): a 384-tap minimum-phase filter fitted to the whole
+  IR's 1/6-octave response, at the level the app means to give it. On fifteen bass IRs in software, what the pedal
+  plays is 2.4 dB rms from the full IR against 7.9 dB for the official conversion, which leaves IRs with a delayed
+  start 35–44 dB too quiet. Confirmed on hardware (re-amped: 2.1 vs 4.8 dB rms, and 5.5 dB vs 16 dB rms plus 46 dB
+  too quiet for a delayed IR). The default for `Device::import_ir_file` (Python too); `convert_with`,
+  `Device::import_ir_file_with(.., Method::App)` for the official conversion, Python `method=`, example `ir_compare`.
+
+### Fixed
+- User IR uploads put the slot in data-header byte 0, as the official app does (it was in byte 1, NAM's slot byte,
+  so only slot 0 was right). `upload::Chunk::ir_slot`; `Reassembler` reports either slot.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added
@@ -94,7 +124,8 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JackMechem/open-stomp-lib/releases/tag/v0.1.0

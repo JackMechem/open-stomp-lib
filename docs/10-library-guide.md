@@ -26,7 +26,7 @@ the pedal, your program can do with the calls below. From Python, see [11](11-py
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.3.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.4.0" }
 # or, with a local checkout next to your project:
 open-stomp = { path = "../open-stomp-lib" }
 # protocol only (no MIDI I/O, no dependencies):
@@ -281,14 +281,34 @@ let c = convert::convert_measured(&mut model, &convert::excitation(), Measure::O
 // or, with your own starting point and settings: nam::optimise::optimise(&mut model, &init_data, &options)
 ```
 
+**Level.** Raw conversions keep the model's own level, which on the pedal is often quiet (it depends on how the model
+was captured; the official app does the same). `dev.import_nam_file` normalises it, like NAM plugins do:
+`nam::convert::normalise_level(&mut c, &mut model)` scales G2 so every model plays at `NORMALISED_LEVEL_DB`. It is a
+pure volume change. `dev.import_nam_file_as(slot, path, measure, normalise)` chooses.
+
 `nam::optimise::simulate(&data, &input)` predicts what the pedal outputs for any upload (mono, 48 kHz, in the
 re-amp rig's input units).
+
+### Importing an IR
+
+```rust
+dev.import_ir_file(0, "My Cab.wav")?;             // optimised conversion + upload to USER IR 01, named "My Cab"
+```
+
+Or step by step: `ir::Wav::load(path)?`, `ir::convert(&wav)` (first channel, resampled to 48 kHz, the first 2048
+samples reversed and scaled), then `dev.import_user_ir(slot, name, &c.data)`. This is the official app's conversion,
+recovered from its code and identical to its uploads ([05](05-uploads-nam-ir.md)). `ir::resample` (windowed sinc),
+`ir::resample_like_app` and `Wav::to_bytes` are there for your own processing.
+
+The pedal only plays the first 384 samples (8 ms) of an IR, so long IRs, or IRs that start after a delay, lose a lot
+on the pedal with the app's conversion. `ir::convert_optimised` fits a 384-tap filter to the whole IR instead
+([05](05-uploads-nam-ir.md#optimised-ir-conversion)); `dev.import_ir_file` uses it by default, and
+`dev.import_ir_file_with(slot, path, ir::Method::App)` gives exactly the official conversion.
 
 ### Uploading a user AMP or IR
 
 ```rust
-// data: 2048 converted floats (from nam::convert, or a captured conversion).
-// Converting audio files into IR data is not implemented yet (docs/05).
+// data: 2048 converted floats (from nam::convert / ir::convert, or a captured conversion).
 dev.import_user_amp(2, "Jcm800", &data, 1.0)?;   // USER AMP 03: select model 32, slot info, 61 chunks
 dev.import_user_ir(0, "My Cab", &data)?;         // USER IR 01: CAB page, model 30, 61 chunks, name
 dev.delete_user_amp(2)?;

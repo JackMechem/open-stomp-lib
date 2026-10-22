@@ -60,7 +60,7 @@ app re-reads the slot info, which comes back as an empty slot.
 | 0–31 | Name, ASCII, zero-padded (the app sends the file name without `.nam`, up to 31 characters) |
 | 32–35 | `u32` = 256 in every record seen (empty or imported) |
 | 36–51 | 0 |
-| 52–55 | `f32` **factor**: 1.0 in both captured imports (FNDR, Jcm800). Probably the `factor` of the converter callback |
+| 52–55 | `f32` **factor**: 1.0 in every import (the converter's `factor` output, a constant). Not an output gain: an upload with factor 2.0 plays at exactly the same level (re-amped, 2026-10) |
 | 56–95 | 0 after an import; an empty slot reads back with `1.0` in each of the ten floats 56–95 too |
 | 96–127 | 0 |
 
@@ -270,25 +270,87 @@ pedal's fixed `f`.
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
 ```
-→ B1 3B 02, B1 02 1E            app selects CAB page + USER IR 01 (model 30)
+→ B1 02 1E+slot                 app selects the slot's cab model (USER IR 01 = 30); it may show the CAB page first (B1 3B 02)
 → 70 10 01 <data, sub 0, offset, total 8192>   ×61, each ← 70 10 03 <header> ack
-→ 70 09 01 <slot> <packed: 01 00 00 00, 32-byte name "Delay And Reverb">   ← (CC 0x7E 00) + 70 09 03 00…
+→ 70 09 01 <slot> <packed: 01 00 00 00, 32-byte name>   ← (CC 0x7E 00) + 70 09 03 00…
 ```
 
-Data header: the same layout as NAM, with sub-command 0. Only slot 0 was captured; the slot is assumed to sit in header
-byte 1 as for NAM. The `0x09` record is a 4-byte field (`01 00 00 00` after an upload, meaning unknown) and a 32-byte
-name. Note: in the capture this upload sits *just before* the `IR import 'delay and reverb'` marker (the "just
-before" markers were typed after the action).
+Data header: the same layout as NAM, but the slot is in **header byte 0** (byte 1, NAM's slot byte, is 0) and the
+sub-command is 0. The `0x09` record is a 4-byte field (`01 00 00 00` in every import seen, eleven of them) and a 32-byte
+name: the file name without its extension, **cut to 16 characters**. Checked byte for byte against imports into all ten
+slots (`captures/logs/02-ir-tests.log`, `tests/ir_import.rs`).
 
-### What the 2048 floats are
+### What the 2048 floats are (the official converter, 2026-10)
 
-* The app converts any audio file to a 48 kHz WAV first (JUCE in `nux_plugins`: `*_ir_48.wav`).
-* The uploaded 2048 samples (≈ 42.7 ms at 48 kHz) are **not** a straight copy of the start of the WAV. The test file
-  was a long (10 s / 20 s) delay/reverb "IR", and correlation with either candidate file was weak (≈ −0.3 at best,
-  with lead-in trimmed so the peak lands at sample ~253). The app likely trims, normalises and possibly windows or
-  minimum-phases the IR.
-* Re-test with a short, plain cab IR (< 2048 samples) to pin the transform down. Probably just
-  trim + normalise + truncate.
+Recovered from the app's native code (`nux_plugins`: `JuceUtil::convertAudioToWaveFormat`, decompiled with Ghidra)
+and confirmed on eleven captured imports: ten designed test IRs (`tests/data/ir`, `examples/ir_test_files`) and a
+real reverb IR. `ir::convert` reproduces all of them (eight bit for bit, the rest within float rounding,
+`examples/ir_capture_check`).
 
-Vector: `captures/files/ir/IR01.device_floats.bin` (log marker `imported Jcm800`, cmd 0x10, sub 0). Which of the two
-WAVs was used was not recorded (open question).
+1. **Normalise the file.** Unless it is already a 48 kHz mono 24-bit WAV, it is converted to one: JUCE's
+   `ResamplingAudioSource` (`samplesIn/samplesOut = rate / 48000`) writes `⌊len · 48000 / rate⌋` samples of the
+   **first channel** to a 24-bit WAV (`*_ir_48.wav`). The resampler is linear interpolation (single precision) plus
+   JUCE's 2nd-order low-pass at the lower Nyquist frequency, applied to the input when downsampling and to the output
+   when upsampling (not at all within ±0.01 % of 1:1). 24-bit: `round(x · 8388607)`, read back as `/ 8388608`.
+2. **Take the first 2048 samples** (zero-padded), **time-reversed**: `data[2047 − k] = g · ir[k]`, the same layout
+   as the NAM filters. No trimming, windowing or minimum-phase conversion.
+3. **Gain.** The app's `NuxFFT` (16384 points) transforms the 2048 samples (as the impulse response of the FIR they
+   form) and scans bins 136–1023, **398 Hz – 3 kHz**, for the smallest and largest magnitude:
+   `g = 1 / √(max |X| · min |X|)`, so the band's peak and trough end up symmetric about 0 dB. A single impulse
+   becomes exactly 1.0.
+
+`convertAudioToWavWithOut` writes 2048 floats back out reversed as a 24-bit WAV (an export, not part of the import).
+
+### What the pedal plays: 384 of the 2048 IR samples (2026-10)
+
+Re-amping probe IRs (impulses at known taps, uploaded to USER IR 10, the CAB block on its own, sweep deconvolution
+divided by the dry path; `tools/pedalsim/ir_reamp_*.py`) shows that the pedal plays only the **first 384 taps (8 ms)**
+of an uploaded IR: impulses at taps 0–383 come back at their uploaded amplitude (within a few %), taps 384, 450, 500,
+1000, 1500 and 2040 not at all. In upload order that is `data[1664..2048]`; `data[0..1664]` is ignored. The CAB block's
+level is about unity (an impulse of 1.0 at tap 0 measures −0.1 … −0.8 dB against the dry path).
+
+So the official conversion's last 1664 samples are never heard, and its gain is computed on a response the pedal
+doesn't play. Like the NAM filters' 512-tap limit, this leaves room for a better conversion of long IRs.
+
+### Import level
+
+The official conversion plays models at their own captured level scaled down a lot: on the pedal, 24–34 dB below the
+model's own output for the same input, so imports sit well below the built-in amps (13–19 dB for the SVT-VR models
+tested) and need the AMP block's gain and master turned up. NAM plugins instead normalise every model to one level.
+`nam::convert::normalise_level` does the same: it measures what the pedal would play for the model (pink noise at
+−18 dBFS, the optimiser's calibration) and scales G2 to `NORMALISED_LEVEL_DB`. G2 comes after the pedal's saturation,
+so this changes only the volume. Calibrated on the pedal: normalised imports play at the level of the built-in Ampug
+SV Bass and Mes 400 Bass with the same knobs, and two models 6 dB apart raw land within 0.2 dB of each other.
+
+### Optimised IR conversion
+
+`ir::convert_optimised` (`Method::Optimised`) designs the 384 taps the pedal plays from the whole IR:
+
+1. Resample with a windowed sinc (`ir::resample`) instead of JUCE's linear interpolation.
+2. Target: the full IR's magnitude response, 1/6-octave smoothed (384 taps can't resolve finer detail).
+3. A minimum-phase filter with that response (folded cepstrum, 32768 points): no leading delay, energy packed into
+   the start. A few iterations correct the design for what the 384 taps (faded over the last 48) actually produce.
+4. Then the taps themselves are fitted (Adam, 400 steps, hand-written gradient through the FFT) to the full IR's
+   levels in 1/6-octave bands every 1/12 octave from 25 Hz to 20 kHz, level left free.
+5. Level: what the app means to give the IR, its own gain rule on the first 2048 samples counted from the IR's onset,
+   matched over 100 Hz – 8 kHz. The unused 1664 samples of the upload are zero.
+
+About half a second per IR. In software, on fifteen Ampeg bass IRs (`examples/ir_compare`: 1/3-octave error of what
+the pedal plays against the full IR, 31.5 Hz – 16 kHz, level difference removed):
+
+| IRs | Official conversion | Optimised |
+|---|---|---|
+| 8 × "8x10" cab IRs (mic'd, start at sample 0) | 2.5 – 5.4 dB rms, worst band +7 … +23 dB (sub-bass) | 1.0 – 3.5 dB rms |
+| 5 × "SVT" IRs that start after 384 samples | 12.7 – 14.2 dB rms, **38–44 dB too quiet** (the pedal plays the silence before the IR) | 2.7 – 2.9 dB rms, level within 0.4 dB |
+| 2 × DI recordings that start after 2048 samples | 9.9 – 13.6 dB rms, 34 dB too quiet | 2.8 – 3.3 dB rms |
+| Mean | 7.94 dB | 2.42 dB |
+
+**On hardware** (re-amped, the CAB block alone, measured response against the full IR, same measure): "Ampeg 8x10 57
+AH" official 4.78 dB rms, optimised **2.07 dB** at the same level (+0.3 dB); "Ampeg SVT Neumann" (starts 1030 samples
+in) official 16.0 dB rms and **46 dB too quiet**, optimised **5.47 dB** at the intended level. The recorded responses
+match the uploaded 384 taps (correlation 0.97–0.99, within about 1.5 dB at 32 Hz and 0.6 dB above). The extra error
+against software is mostly the 32 Hz band, which a 384-sample window resolves poorly. `Device::import_ir_file` uses
+the optimised conversion by default.
+
+The first capture (`captures/files/ir/IR01.device_floats.bin`, log marker `imported Jcm800`) was the "percussive verb 1"
+WAV: gain 12.5344, reproduced to −138 dB.

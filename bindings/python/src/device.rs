@@ -347,21 +347,27 @@ impl Device {
     /// Convert a `.nam` file and import it into user AMP `slot` (0–9), named after the file, with
     /// open-stomp's own converter (never reads the official app). `measure`: `"optimised"` (the
     /// default and the closest to the model, about a minute), `"app"` (the official algorithm, a
-    /// few seconds) or `"clean"`. Releases the GIL during the conversion. Returns the conversion.
-    #[pyo3(signature = (slot, path, measure = "optimised"))]
+    /// few seconds) or `"clean"`. `normalise` (default on): every model at the same level, like NAM
+    /// plugins (a pure volume change). Releases the GIL during the conversion. Returns the conversion.
+    #[pyo3(signature = (slot, path, measure = "optimised", normalise = true))]
     fn import_nam_file(
         &self,
         py: Python<'_>,
         slot: u8,
         path: std::path::PathBuf,
         measure: &str,
+        normalise: bool,
     ) -> PyResult<crate::nam::Converted> {
         let measure = crate::nam::parse_measure(measure)?;
         // convert without holding the device lock (recv() in other threads keeps working)
         let converted = py.detach(|| -> Result<_, open_stomp::nam::NamError> {
             let mut model = open_stomp::nam::Model::load(&path)?;
             let x = open_stomp::nam::convert::excitation();
-            Ok(open_stomp::nam::convert::convert_measured(&mut model, &x, measure))
+            let mut c = open_stomp::nam::convert::convert_measured(&mut model, &x, measure);
+            if normalise {
+                open_stomp::nam::convert::normalise_level(&mut c, &mut model);
+            }
+            Ok(c)
         });
         let converted = converted.map_err(crate::nam::err)?;
         let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
@@ -385,6 +391,21 @@ impl Device {
         let g = self.lock();
         let d = g.as_ref().ok_or_else(closed)?;
         d.import_user_ir(slot, name, &data).map_err(crate::upload::err)
+    }
+
+    /// Convert an IR WAV file and import it into user IR `slot` (0–9), named after the file
+    /// (first 16 characters) like the official app. `method`: `"optimised"` (default, closest to
+    /// the real IR on the pedal) or `"app"` (exactly the official conversion). Returns the
+    /// conversion.
+    #[pyo3(signature = (slot, path, method = "optimised"))]
+    fn import_ir_file(&self, slot: u8, path: std::path::PathBuf, method: &str) -> PyResult<crate::ir::ConvertedIr> {
+        let method = crate::ir::parse_method(method)?;
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.import_ir_file_with(slot, &path, method).map(Into::into).map_err(|e| match e.downcast::<open_stomp::upload::UploadError>() {
+            Ok(u) => crate::upload::err(*u),
+            Err(e) => crate::ir::err(e),
+        })
     }
 
     /// Write the global settings (start from `DeviceState.settings` so unknown bytes survive).

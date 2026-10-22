@@ -1,7 +1,7 @@
 # open-stomp
 
 A Rust library for the SORAN Dual Stomp Lite guitar pedal ·
-Version **0.3.0** · Linux · macOS · Windows · [changelog](CHANGELOG.md)
+Version **0.4.0** · Linux · macOS · Windows · [changelog](CHANGELOG.md)
 
 `open-stomp` talks to the **SORAN Dual Stomp Lite** guitar multi-effects pedal (USB `3962:2000`, "JME STOMPBOX")
 over USB-MIDI. It implements the protocol reverse engineered from the vendor's *Stomp Manager* app, and this repo
@@ -35,7 +35,7 @@ The protocol layer has no I/O and no dependencies. The device layer uses [`midir
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.3.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.4.0" }
 ```
 
 ```rust
@@ -122,20 +122,45 @@ optimises the filters until the simulated pedal sounds like the model. This is t
 `Device::import_nam_file`; it takes about a minute per model.
 
 Re-amped through the pedal and compared with the real model in software (Ampeg SVT bass model; rms error over
-1/3-octave sweep responses, note levels and harmonics; lower is better):
+1/3-octave sweep responses, note levels and harmonics, levels as uploaded before normalisation; lower is better):
 
 | Upload | Frequency response | Note level | Harmonics | Overall |
 |---|---|---|---|---|
 | Official app | 7.96 dB | 9.64 dB | 13.11 dB | **9.32 dB** |
 | open-stomp, optimised (two runs) | 5.56 dB | 4.23 dB | 10.57–11.00 dB | **6.72–6.85 dB** |
 
-![Frequency response on the pedal: the real NAM model, the official app's conversion and open-stomp's](docs/images/nam-frequency-response.png)
+![NAM frequency response on the pedal: the real model, the official app's conversion and open-stomp's](docs/images/nam-frequency-response.png)
 
-![Difference from the real model for both conversions](docs/images/nam-frequency-error.png)
+![NAM: difference from the real model for both conversions](docs/images/nam-frequency-error.png)
 
-The official conversion is off by up to 15–24 dB in the deep bass, the 400 Hz–1 kHz mids at low levels and the top
-octave. open-stomp follows the model's shape much more closely. It is still 3–5 dB quiet overall and short on the
-60–100 Hz resonance, which 512 taps can't fully reach. Details: [docs/05](docs/05-uploads-nam-ir.md#optimised-conversion).
+The graphs compare tone, so each upload is level-matched to the model over 100 Hz–8 kHz. Level is set separately: by
+default an import is normalised to the built-in amps' level. With levels matched, the official conversion is off by
+up to 15–24 dB in the deep bass, the 400 Hz–1 kHz mids at low input levels and the top octave (6.4–9.2 dB rms).
+open-stomp stays within about 5 dB from 50 Hz to 10 kHz (3.7–4.0 dB rms). It is still short on the 60–100 Hz
+resonance, which 512 taps can't fully reach. Details: [docs/05](docs/05-uploads-nam-ir.md#optimised-conversion).
+
+## IR conversion: closer to the real cab than the official app
+
+The pedal plays only the first 384 taps (8 ms) of a user IR. The official app uploads the start of the file as it
+is, cut off at that point, so it loses whatever comes later. That includes the whole IR when the file starts with
+silence. open-stomp designs a 384-tap minimum-phase filter fitted to the full IR's response instead. This is the
+default for `Device::import_ir_file`; it takes about half a second.
+
+Re-amped through the pedal and compared with the full IR file in software (two Ampeg SVT cab IRs, levels matched):
+
+![IR frequency response on the pedal: the full IR file, the official app's upload and open-stomp's](docs/images/ir-frequency-response.png)
+
+![IR: difference from the full IR file for both uploads](docs/images/ir-frequency-error.png)
+
+| IR | Official app | open-stomp, optimised |
+|---|---|---|
+| Ampeg 8x10 57 AH | 3.95 dB rms | **2.36 dB rms** |
+| Ampeg SVT Neumann | 14.97 dB rms, and about 40 dB quieter | **5.87 dB rms** |
+
+The SVT Neumann file starts with 21 ms of silence, so the official upload plays almost none of the cab. Both
+uploads have too much energy below 50 Hz, where the cab rolls off more steeply than 8 ms can follow. open-stomp is
+also a few dB short around 60–100 Hz on that IR. Details: [docs/05](docs/05-uploads-nam-ir.md).
+
 The analysis code is in [`tools/pedalsim`](tools/pedalsim); `readme_plots.py --cached` redraws these graphs.
 
 ## Status
@@ -151,7 +176,7 @@ The analysis code is in [`tools/pedalsim`](tools/pedalsim); `readme_plots.py --c
 | System settings | ✅ (some bytes unknown) | ✅ decode + encode |
 | User AMP (NAM) / user IR upload transport | ✅ chunk protocol decoded | ✅ `upload`, byte-exact vs capture |
 | NAM inference and NAM → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `nam`, verified against the app; optimised conversion verified on hardware |
-| IR (audio) → device conversion | ❌ open | ❌ |
+| IR (audio) → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `ir`, `Device::import_ir_file`, byte-exact vs the app |
 
 Live CCs are verified on hardware. Preset and settings **writes** match the official app byte for byte but have not
 yet been run on hardware from this code. Back up your presets first.

@@ -29,6 +29,12 @@ impl Chunk {
         self.0.slot
     }
 
+    /// Header byte 0: the user IR slot in IR data chunks (0 in NAM uploads).
+    #[getter]
+    fn ir_slot(&self) -> u8 {
+        self.0.ir_slot
+    }
+
     /// 0x58: 1 data, 3 write info, 4 read info, 6 delete. 0x10: 0 data.
     #[getter]
     fn sub(&self) -> u8 {
@@ -52,7 +58,7 @@ impl Chunk {
 
     fn __repr__(&self) -> String {
         let c = &self.0;
-        format!("Chunk(slot={}, sub={}, offset={}, total={}, data=<{} bytes>)", c.slot, c.sub, c.offset, c.total, c.data.len())
+        format!("Chunk(ir_slot={}, slot={}, sub={}, offset={}, total={}, data=<{} bytes>)", c.ir_slot, c.slot, c.sub, c.offset, c.total, c.data.len())
     }
 }
 

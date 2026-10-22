@@ -360,6 +360,39 @@ pub fn convert_optimised(model: &mut Model, bla_x: &[f32], on_step: &mut dyn FnM
     c
 }
 
+/// The common output level imports are normalised to ([`normalise_level`]): the pedal's output, in
+/// dB re full scale, for pink noise at −18 dBFS into the pedal (the re-amp rig's units). Calibrated
+/// on the pedal so normalised imports play at the level of its built-in bass amps (Ampug SV Bass,
+/// Mes 400 Bass) with the same knobs (re-amped, `tools/pedalsim/nam_level_rig.py`).
+pub const NORMALISED_LEVEL_DB: f64 = -32.5;
+
+/// The pedal's output level for `model` with the optimiser's input/output calibration, in dB, for
+/// pink noise at −18 dBFS: what an upload that matches the model plays at (resets the model).
+pub fn pedal_level_db(model: &mut Model) -> f64 {
+    let sig = super::optimise::test_signal();
+    let seg = sig.segments.iter().find(|s| s.name == "pink -18").expect("the test signal has its pink segment");
+    let y = super::optimise::render_target(model, &sig.x[seg.start..seg.start + seg.len]);
+    // skip the first 100 ms (the model and DC blocker settling)
+    let y = &y[4800..];
+    10.0 * (y.iter().map(|v| v * v).sum::<f64>() / y.len() as f64).log10()
+}
+
+/// Normalise a conversion's output level like NAM plugins do, so every import plays at the same
+/// level ([`NORMALISED_LEVEL_DB`]) whatever level its model was captured at. Only G2 (after the
+/// pedal's saturation) is scaled, so this is a pure volume change: the tone and the way the amp
+/// breaks up stay the same. Returns the gain applied, in dB.
+pub fn normalise_level(c: &mut Converted, model: &mut Model) -> f64 {
+    let gain_db = NORMALISED_LEVEL_DB - pedal_level_db(model);
+    let g = 10f64.powf(gain_db / 20.0);
+    for v in &mut c.data[1024..] {
+        *v = (*v as f64 * g) as f32;
+    }
+    for v in &mut c.g2_ir {
+        *v *= g;
+    }
+    gain_db
+}
+
 /// Convert with a given excitation and measurement mode. Resets the model first.
 pub fn convert_measured(model: &mut Model, bla_x: &[f32], measure: Measure) -> Converted {
     if measure == Measure::Optimised {

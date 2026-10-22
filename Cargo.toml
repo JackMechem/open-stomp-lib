@@ -6,7 +6,7 @@ default-members = ["."]
 
 [workspace.package]
 # one version for the crate and the Python package
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -71,3 +71,11 @@ required-features = ["nam"]
 
 [package.metadata.docs.rs]
 all-features = true
+
+[[example]]
+name = "ir_compare"
+required-features = ["nam"]
+
+[[example]]
+name = "nam_level"
+required-features = ["nam"]

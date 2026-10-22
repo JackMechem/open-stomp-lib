@@ -247,7 +247,8 @@ impl Device {
     }
 
     /// Convert a `.nam` file with the best conversion, [`Measure::Optimised`](crate::nam::convert::Measure::Optimised)
-    /// (closer to the model on hardware than the official app's), and import it into user AMP
+    /// (closer to the model on hardware than the official app's) at a normalised level
+    /// ([`crate::nam::convert::normalise_level`]), and import it into user AMP
     /// `slot` (0–9), named after the file like the official app does. Never reads the official app
     /// (see [`crate::nam::convert::official_excitation`] to opt in). The conversion runs on the
     /// calling thread and takes about a minute (optimised build); [`Device::import_nam_file_with`]
@@ -258,12 +259,13 @@ impl Device {
         slot: u8,
         path: impl AsRef<std::path::Path>,
     ) -> Result<crate::nam::Converted, Box<dyn std::error::Error + Send + Sync>> {
-        self.import_nam_file_with(slot, path, crate::nam::convert::Measure::Optimised)
+        self.import_nam_file_as(slot, path, crate::nam::convert::Measure::Optimised, true)
     }
 
     /// [`Device::import_nam_file`] with a choice of conversion
     /// ([`Measure`](crate::nam::convert::Measure)): `Optimised` (the default, about a minute),
-    /// `App` (the official algorithm, a few seconds) or `Clean`.
+    /// `App` (the official algorithm, a few seconds) or `Clean`. Keeps the model's own level, as
+    /// the official app does; [`Device::import_nam_file_as`] can normalise it.
     #[cfg(feature = "nam")]
     pub fn import_nam_file_with(
         &self,
@@ -271,13 +273,30 @@ impl Device {
         path: impl AsRef<std::path::Path>,
         measure: crate::nam::convert::Measure,
     ) -> Result<crate::nam::Converted, Box<dyn std::error::Error + Send + Sync>> {
+        self.import_nam_file_as(slot, path, measure, false)
+    }
+
+    /// [`Device::import_nam_file_with`], optionally normalising the output level
+    /// ([`crate::nam::convert::normalise_level`]: every model plays at the same level, like NAM
+    /// plugins do; a pure volume change).
+    #[cfg(feature = "nam")]
+    pub fn import_nam_file_as(
+        &self,
+        slot: u8,
+        path: impl AsRef<std::path::Path>,
+        measure: crate::nam::convert::Measure,
+        normalise: bool,
+    ) -> Result<crate::nam::Converted, Box<dyn std::error::Error + Send + Sync>> {
         let path = path.as_ref();
         if slot >= upload::USER_SLOTS {
             return Err(Box::new(UploadError::Slot(slot)));
         }
         let mut model = crate::nam::Model::load(path)?;
-        let converted =
+        let mut converted =
             crate::nam::convert::convert_measured(&mut model, &crate::nam::convert::excitation(), measure);
+        if normalise {
+            crate::nam::convert::normalise_level(&mut converted, &mut model);
+        }
         let name = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         self.import_user_amp(slot, &name, &converted.data, converted.factor)?;
         Ok(converted)
@@ -303,6 +322,40 @@ impl Device {
         }
         self.write(upload::user_ir_upload(slot, name, data));
         Ok(())
+    }
+
+    /// Convert an IR audio file (WAV, any sample rate) with the best conversion,
+    /// [`crate::ir::convert_optimised`] (a 384-tap filter fitted to the whole IR: the pedal only
+    /// plays 384 taps, so this is much closer to the real IR than the official app's), and import
+    /// it into user IR `slot` (0–9), named after the file like the official app does (first 16
+    /// characters). [`Device::import_ir_file_with`] with `Method::App` gives exactly the official
+    /// conversion. Returns the conversion.
+    pub fn import_ir_file(
+        &self,
+        slot: u8,
+        path: impl AsRef<std::path::Path>,
+    ) -> Result<crate::ir::ConvertedIr, Box<dyn std::error::Error + Send + Sync>> {
+        #[cfg(feature = "nam")]
+        let method = crate::ir::Method::Optimised;
+        #[cfg(not(feature = "nam"))]
+        let method = crate::ir::Method::App;
+        self.import_ir_file_with(slot, path, method)
+    }
+
+    /// [`Device::import_ir_file`] with a choice of conversion ([`crate::ir::Method`]).
+    pub fn import_ir_file_with(
+        &self,
+        slot: u8,
+        path: impl AsRef<std::path::Path>,
+        method: crate::ir::Method,
+    ) -> Result<crate::ir::ConvertedIr, Box<dyn std::error::Error + Send + Sync>> {
+        let path = path.as_ref();
+        if slot >= upload::USER_SLOTS {
+            return Err(Box::new(UploadError::Slot(slot)));
+        }
+        let converted = crate::ir::convert_with(&crate::ir::Wav::load(path)?, method);
+        self.import_user_ir(slot, &crate::ir::slot_name(path), &converted.data)?;
+        Ok(converted)
     }
 
     /// Write the global settings (read-modify-write: start from the pedal's current record).

@@ -11,6 +11,7 @@ Python bindings for the `open-stomp` Rust library. The modules mirror the crate:
 * ``open_stomp.capture``   capture log reader
 * ``open_stomp.upload``    user AMP (NAM) / user IR upload framing
 * ``open_stomp.nam``       load and run .nam models; convert them for the pedal
+* ``open_stomp.ir``        read/write WAV IRs; convert them for the pedal
 * ``open_stomp.device``    ``Device``: the background connection engine
 
 Guide: https://github.com/JackMechem/open-stomp-lib/blob/main/docs/11-python-guide.md
@@ -23,7 +24,7 @@ from ._native import USB_ID, __version__, is_stomp_port
 
 # Expose the extension's submodules as real modules, so `import open_stomp.midi` and
 # `from open_stomp.midi.host import cc` work like any package.
-for _name in ("pack", "midi", "catalog", "records", "state", "queue", "capture", "upload", "nam", "device"):
+for _name in ("pack", "midi", "catalog", "records", "state", "queue", "capture", "upload", "nam", "ir", "device"):
     _mod = getattr(_native, _name)
     _mod.__name__ = f"{__name__}.{_name}"
     _sys.modules[_mod.__name__] = _mod
@@ -53,6 +54,7 @@ __all__ = [
     "capture",
     "upload",
     "nam",
+    "ir",
     "device",
     "Assembler",
     "Device",

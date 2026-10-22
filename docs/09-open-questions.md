@@ -8,10 +8,11 @@ Ordered by usefulness for a Linux editor. Each item says how to resolve it.
    Confirmed on hardware (2026-10-21, firmware V1.1.1): an Ampeg SVT model converted by the official algorithm and by
    ours, both uploaded by `open_stomp`, sound identical on the pedal. Left: LSTM/ConvNet NAM models (the app's NAM
    core supports ConvNet too).
-2. **IR transform.** Capture an upload of a short plain cab IR (< 2048 samples) and compare sample by sample. Also
-   record which file was used for the existing capture (the two Tone Charm WAVs are candidates).
-3. **IR slot 4-byte field** (`0x09` record bytes 0–3): a CRC or a flag? It was `01 00 00 00` after an upload.
-   Compare across two different IR uploads.
+2. ~~**IR transform**~~: solved (docs/05): resampled first channel, first 2048 samples reversed, gain centring the
+   398 Hz – 3 kHz response on 0 dB. `ir::convert` matches eleven captured imports. The pedal plays only the first
+   384 taps (docs/05).
+3. **IR slot 4-byte field** (`0x09` record bytes 0–3): `01 00 00 00` in all eleven imports captured (ten slots,
+   different files and names), so probably a constant or a "slot in use" flag.
 4. **Preset unknown bytes**: offset 8 (`0x62`), 79–81, 82 (`6`), 90–93. Toggle things in the app that aren't
    covered yet (chain reordering, tempo/BPM per preset, scenes if any) and diff `0x0C` reads.
 5. **Host→pedal CCs not yet captured**: ~~drum pattern `0x40`, loop levels `0x42/0x43`~~ (confirmed on Linux, see

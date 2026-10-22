@@ -60,3 +60,12 @@ def test_official_excitation_when_installed():
     assert len(x) == nam.FFT_SIZE and max(abs(v) for v in x) < 1e-4
     with pytest.raises(ValueError):
         nam.official_excitation(DATA)          # no table in the test data
+
+
+def test_level_normalisation():
+    m = nam.Model.load(DATA / "wavenet.nam")
+    raw, norm = nam.convert(m), nam.convert(m, normalise=True)
+    assert raw.data[:1024] == norm.data[:1024]           # G1 untouched: a pure volume change
+    gain_db = nam.NORMALISED_LEVEL_DB - nam.pedal_level_db(m)
+    ratio = norm.data[2047] / raw.data[2047]
+    assert ratio == pytest.approx(10 ** (gain_db / 20), rel=1e-5)

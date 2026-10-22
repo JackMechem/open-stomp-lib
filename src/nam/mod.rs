@@ -82,6 +82,9 @@ pub struct Model {
     pub name: Option<String>,
     /// The architecture as written in the file (`"WaveNet"`, `"SlimmableContainer"`).
     pub architecture: String,
+    /// The model's loudness in dB, from the file's metadata (written by the NAM trainer: the
+    /// model's output level on its standard input). NAM plugins normalise the output with it.
+    pub loudness: Option<f64>,
 }
 
 fn weights_of(v: &Value) -> Result<Vec<f32>, NamError> {
@@ -125,7 +128,8 @@ impl Model {
         let net = build(&v)?;
         let name = v.get("metadata").and_then(|m| m.get("name")).and_then(Value::as_str).map(str::to_owned);
         let architecture = v.get("architecture").and_then(Value::as_str).unwrap_or("").to_owned();
-        Ok(Model { net, name, architecture })
+        let loudness = v.get("metadata").and_then(|m| m.get("loudness")).and_then(Value::as_f64);
+        Ok(Model { net, name, architecture, loudness })
     }
 
     /// Process a block (any length; state carries over between calls).

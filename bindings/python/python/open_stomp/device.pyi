@@ -7,6 +7,7 @@ from typing import Literal, Optional, Union, final
 
 from ._types import BytesLike
 from .catalog import Module
+from .ir import ConvertedIr
 from .nam import Converted
 from .records import Preset, Settings
 from .state import Origin
@@ -89,7 +90,11 @@ class Device:
         slot: int,
         path: Union[str, os.PathLike[str]],
         measure: Literal["app", "clean", "optimised"] = "optimised",
+        normalise: bool = True,
     ) -> Converted: ...
     def delete_user_amp(self, slot: int) -> None: ...
     def import_user_ir(self, slot: int, name: str, data: Sequence[float]) -> None: ...
+    def import_ir_file(
+        self, slot: int, path: Union[str, os.PathLike[str]], method: Literal["app", "optimised"] = "optimised"
+    ) -> ConvertedIr: ...
     def write_settings(self, settings: Settings) -> None: ...
