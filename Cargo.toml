@@ -75,3 +75,7 @@ all-features = true
 [[example]]
 name = "ir_compare"
 required-features = ["nam"]
+
+[[example]]
+name = "nam_level"
+required-features = ["nam"]

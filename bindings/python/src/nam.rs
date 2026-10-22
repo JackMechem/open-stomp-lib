@@ -55,6 +55,12 @@ impl Model {
         self.0.sample_rate()
     }
 
+    /// Loudness in dB from the file's metadata, if any.
+    #[getter]
+    fn loudness(&self) -> Option<f64> {
+        self.0.loudness
+    }
+
     fn __repr__(&self) -> String {
         format!("Model(name={:?}, architecture={:?})", self.0.name, self.0.architecture)
     }
@@ -102,10 +108,17 @@ impl Converted {
 /// `excitation`: 8192 samples to use instead of ours (e.g. the official app's `BLA_x`).
 /// `measure`: `"app"` (the official algorithm, default), `"clean"` (steady-state small-signal
 /// measurement, no DC-blocker transient) or `"optimised"` (clean, then fitted with a simulation of
-/// the pedal; about a minute). Releases the GIL; takes a few seconds.
+/// the pedal; about a minute). `normalise`: scale the output to a common level like NAM plugins
+/// do (a pure volume change). Releases the GIL; takes a few seconds.
 #[pyfunction]
-#[pyo3(signature = (model, excitation = None, measure = "app"))]
-fn convert(py: Python<'_>, model: &Bound<'_, PyAny>, excitation: Option<Vec<f32>>, measure: &str) -> PyResult<Converted> {
+#[pyo3(signature = (model, excitation = None, measure = "app", normalise = false))]
+fn convert(
+    py: Python<'_>,
+    model: &Bound<'_, PyAny>,
+    excitation: Option<Vec<f32>>,
+    measure: &str,
+    normalise: bool,
+) -> PyResult<Converted> {
     let measure = parse_measure(measure)?;
     let mut owned;
     let mut borrowed;
@@ -123,7 +136,13 @@ fn convert(py: Python<'_>, model: &Bound<'_, PyAny>, excitation: Option<Vec<f32>
         return Err(PyValueError::new_err(format!("excitation must be {} samples", n::convert::N)));
     }
     let x = excitation.unwrap_or_else(n::convert::excitation);
-    let c = py.detach(|| n::convert::convert_measured(m, &x, measure));
+    let c = py.detach(|| {
+        let mut c = n::convert::convert_measured(m, &x, measure);
+        if normalise {
+            n::convert::normalise_level(&mut c, m);
+        }
+        c
+    });
     Ok(c.into())
 }
 
@@ -154,6 +173,14 @@ fn official_excitation(path: Option<std::path::PathBuf>) -> PyResult<Vec<f32>> {
     }
 }
 
+/// The pedal's output level (dB) for a model with the optimiser's calibration, for pink noise at
+/// -18 dBFS: what `normalise` scales to `NORMALISED_LEVEL_DB`.
+#[pyfunction]
+fn pedal_level_db(py: Python<'_>, mut model: PyRefMut<'_, Model>) -> f64 {
+    let m = &mut model.0;
+    py.detach(|| n::convert::pedal_level_db(m))
+}
+
 /// Our BLA excitation (8192 samples, pink multisine at about -90 dBFS).
 #[pyfunction]
 fn excitation() -> Vec<f32> {
@@ -165,6 +192,8 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Converted>()?;
     m.add_function(wrap_pyfunction!(convert, m)?)?;
     m.add_function(wrap_pyfunction!(excitation, m)?)?;
+    m.add_function(wrap_pyfunction!(pedal_level_db, m)?)?;
+    m.add("NORMALISED_LEVEL_DB", n::convert::NORMALISED_LEVEL_DB)?;
     m.add_function(wrap_pyfunction!(official_excitation, m)?)?;
     m.add("TONE_BINS", n::convert::TONE_BINS.to_vec())?;
     m.add("FFT_SIZE", n::convert::N)?;

@@ -281,6 +281,11 @@ let c = convert::convert_measured(&mut model, &convert::excitation(), Measure::O
 // or, with your own starting point and settings: nam::optimise::optimise(&mut model, &init_data, &options)
 ```
 
+**Level.** Raw conversions keep the model's own level, which on the pedal is often quiet (it depends on how the model
+was captured; the official app does the same). `dev.import_nam_file` normalises it, like NAM plugins do:
+`nam::convert::normalise_level(&mut c, &mut model)` scales G2 so every model plays at `NORMALISED_LEVEL_DB`. It is a
+pure volume change. `dev.import_nam_file_as(slot, path, measure, normalise)` chooses.
+
 `nam::optimise::simulate(&data, &input)` predicts what the pedal outputs for any upload (mono, 48 kHz, in the
 re-amp rig's input units).
 

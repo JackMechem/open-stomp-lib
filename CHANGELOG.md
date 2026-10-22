@@ -7,6 +7,15 @@ All notable changes to `open-stomp`. The format follows
 ## [Unreleased]
 
 ### Added
+- NAM import level normalisation, like NAM plugins: `nam::convert::normalise_level` scales G2 (after the pedal's
+  saturation, so a pure volume change) so that every model plays at the same level, `NORMALISED_LEVEL_DB`
+  (provisional), measured with `pedal_level_db` on pink noise. Models span about 17 dB raw; the conversions inherit
+  the official app's level, which plays models quietly (24–34 dB below their own output). On by default for
+  `Device::import_nam_file`; `Device::import_nam_file_as(.., normalise)`, Python `nam.convert(..., normalise=True)`
+  and `Device.import_nam_file(..., normalise=...)`. `nam::Model::loudness` (the file's metadata). Example
+  `nam_level`.
+
+### Added
 - `ir` module: read and write WAV files (`Wav`: PCM 8–32-bit and float, any channel count), and `convert`, the
   official app's IR conversion recovered from its native code: files that aren't 48 kHz mono 24-bit are converted
   first (first channel, JUCE's resampler, `resample_like_app`, 24-bit), then the first 2048 samples are reversed and

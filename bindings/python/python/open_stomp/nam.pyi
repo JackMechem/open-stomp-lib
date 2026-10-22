@@ -6,6 +6,7 @@ from typing import Literal, Optional, Union, final
 
 TONE_BINS: list[int]
 FFT_SIZE: int
+NORMALISED_LEVEL_DB: float
 
 @final
 class Model:
@@ -21,6 +22,8 @@ class Model:
     def architecture(self) -> str: ...
     @property
     def sample_rate(self) -> Optional[float]: ...
+    @property
+    def loudness(self) -> Optional[float]: ...
 
 @final
 class Converted:
@@ -46,6 +49,8 @@ def convert(
     model: Union[Model, str, os.PathLike[str]],
     excitation: Optional[Sequence[float]] = None,
     measure: Literal["app", "clean", "optimised"] = "app",
+    normalise: bool = False,
 ) -> Converted: ...
+def pedal_level_db(model: Model) -> float: ...
 def excitation() -> list[float]: ...
 def official_excitation(path: Optional[Union[str, os.PathLike[str]]] = None) -> list[float]: ...
