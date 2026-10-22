@@ -29,7 +29,7 @@ All notable changes to `open-stomp`. The format follows
   sweeps, tones and pink noise, starting from the clean conversion. Hand-written gradients, Adam,
   no ML framework; about a minute per model. A PyTorch prototype of the same optimiser beat the
   official conversion on hardware (Ampeg SVT bass model: 6.7–7.0 vs 9.0 dB rms error against the
-  real model); this port scores 6.3 in simulation (official 8.9). `Device::import_nam_file_with`,
+  real model); this port scores 6.72–6.85 on hardware (official 9.32 in the same session). `Device::import_nam_file_with`,
   `optimise::simulate`, example `nam_optimise`. Python: `measure="optimised"` in `nam.convert` and
   `Device.import_nam_file`.
 - `nam::convert::official_excitation` / `find_official_excitation`: read the official app's test

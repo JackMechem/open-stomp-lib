@@ -259,8 +259,10 @@ Results on the Ampeg SVT "Gain 10 Ultra Lo and Hi MD 421" bass model, scored aga
 | PyTorch prototype of the optimiser, two runs (recorded) | 5.70–5.74 | 5.62 | 9.93–10.98 | 6.73–7.02 |
 | PyTorch prototype (simulated) | 5.93 | 5.83 | 9.30 | 6.70 |
 | `Measure::Optimised` (simulated) | 5.79 | 4.47 | 8.57 | 6.31 |
+| `Measure::Optimised`, two runs (recorded) | 5.56 | 4.23 | 10.57–11.00 | 6.72–6.85 |
 
-The Rust port differs from the prototype only in leaving out the rig's dry-path EQ from the target (≤ 0.4 dB) and in
+Recorded in the same session as the prototype's second upload (6.86) and the official one (9.32 that day; the rig
+drifted 0.01 dB since the first session). The Rust port differs from the prototype only in leaving out the rig's dry-path EQ from the target (≤ 0.4 dB) and in
 its pink-noise generator. Still missing on hardware: the overall level is 3–5 dB low and the model's 60–100 Hz
 resonance is up to ~10 dB short. 512 taps (10.7 ms) can't resolve it fully, and the harmonics are limited by the
 pedal's fixed `f`.
