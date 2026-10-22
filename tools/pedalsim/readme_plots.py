@@ -94,7 +94,7 @@ def figure(panels, bands, path, title, ref_label, diff, shape):
         style(ax, name)
         ref = np.array(curves["real"])
         if diff:
-            ax.axhline(0, color=REF, lw=2.6)
+            ax.axhline(0, color=MUTED, lw=1.2, ls=(0, (4, 3)))   # the reference minus itself
         else:
             ax.plot(bands, ref, color=REF, lw=2.6, solid_capstyle="round")
         for key, label, color in CONVERSIONS:
@@ -104,7 +104,8 @@ def figure(panels, bands, path, title, ref_label, diff, shape):
             ax.plot(bands, y - ref if diff else y, color=color, lw=2.0, solid_capstyle="round")
     for ax in axes[-1]: ax.set_xlabel("Frequency (Hz)")
     for ax in axes[:, 0]: ax.set_ylabel("Difference (dB)" if diff else "Level (dB, matched)")
-    handles = [plt.Line2D([], [], color=REF, lw=2.6, label=ref_label + (" (0 dB)" if diff else ""))] + \
+    handles = [plt.Line2D([], [], color=MUTED, lw=1.2, ls=(0, (4, 3)), label=f"0 dB = same as the {ref_label[0].lower() + ref_label[1:]}")
+               if diff else plt.Line2D([], [], color=REF, lw=2.6, label=ref_label)] + \
               [plt.Line2D([], [], color=c, lw=2.0, label=l) for _, l, c in CONVERSIONS]
     h = 3.3 * rows + 0.6   # header in inches from the top: title, legend, then the panels
     fig.text(0.06, 1 - 0.1 / h, title, ha="left", va="top", fontsize=12.5, color=INK, weight="bold")
@@ -121,7 +122,7 @@ panels = [(f"Input {k.split()[1]} dBFS", {s: nam[s][k] for s in ("real", "offici
 figure(panels, nb, OUT / "nam-frequency-response.png",
        "NAM on the pedal: Ampeg SVT bass model (levels matched)", "Real NAM model", False, (2, 2))
 figure(panels, nb, OUT / "nam-frequency-error.png",
-       "NAM: difference from the real model (closer to 0 dB is better)", "Real NAM model", True, (2, 2))
+       "NAM: how far each upload is from the real model (closer to 0 dB is better)", "Real NAM model", True, (2, 2))
 
 irs = json.load(open(IR_CACHE))
 ib = np.array(irs["bands"])
@@ -129,4 +130,4 @@ panels = list(irs["irs"].items())
 figure(panels, ib, OUT / "ir-frequency-response.png",
        "IR on the pedal: Ampeg SVT cab IRs (levels matched)", "Full IR file", False, (1, 2))
 figure(panels, ib, OUT / "ir-frequency-error.png",
-       "IR: difference from the full IR file (closer to 0 dB is better)", "Full IR file", True, (1, 2))
+       "IR: how far each upload is from the full IR file (closer to 0 dB is better)", "Full IR file", True, (1, 2))
