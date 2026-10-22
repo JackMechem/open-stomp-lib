@@ -18,7 +18,7 @@
 //! A port of open-stomp-manager `tools/pedalsim` (PyTorch); `tests/data/optim` holds its reference
 //! values.
 
-// the gradients that use the rest come in the next step of the port
+// the optimiser loop that uses the rest comes in the next step of the port
 #![allow(dead_code)]
 
 use std::sync::Arc;
@@ -165,6 +165,48 @@ impl Conv {
             }
         }
         y
+    }
+
+    /// The adjoint of [`Conv::apply`] for the signal: `gx[m] = Σ_k h[k]·g[m + k]`.
+    fn correlate(&self, g: &[f64], h: &[Complex64]) -> Vec<f64> {
+        let len = g.len();
+        let mut gx = vec![0.0; len];
+        let mut buf = vec![Complex64::default(); BLOCK];
+        for b in 0..Self::blocks(len) {
+            let s = b * HOP;
+            for (j, o) in buf.iter_mut().enumerate() {
+                *o = Complex64::new(g.get(s + j).copied().unwrap_or(0.0), 0.0);
+            }
+            self.fwd.process(&mut buf);
+            for (o, c) in buf.iter_mut().zip(h) {
+                *o *= c.conj();
+            }
+            self.inv.process(&mut buf);
+            for (j, o) in gx[s..(s + HOP).min(len)].iter_mut().enumerate() {
+                *o = buf[j].re / BLOCK as f64;
+            }
+        }
+        gx
+    }
+
+    /// The adjoint of [`Conv::apply`] for the filter: `gh[k] = Σ_n g[n]·x[n − k]`, `k <`
+    /// [`PEDAL_TAPS`], from the block spectra of `x`.
+    fn filter_grad(&self, blocks: &[Vec<Complex64>], g: &[f64]) -> Vec<f64> {
+        let mut acc = vec![Complex64::default(); BLOCK];
+        let mut buf = vec![Complex64::default(); BLOCK];
+        for (b, xb) in blocks.iter().enumerate() {
+            let s = b * HOP;
+            buf.fill(Complex64::default());
+            for (j, &v) in g[s..(s + HOP).min(g.len())].iter().enumerate() {
+                buf[HIST + j].re = v;
+            }
+            self.fwd.process(&mut buf);
+            for ((a, gb), xc) in acc.iter_mut().zip(&buf).zip(xb) {
+                *a += gb * xc.conj();
+            }
+        }
+        self.inv.process(&mut acc);
+        acc[..PEDAL_TAPS].iter().map(|c| c.re / BLOCK as f64).collect()
     }
 }
 
@@ -348,16 +390,165 @@ impl Simulator {
         Run { u, v, y }
     }
 
+    /// Gradients w.r.t. `h1` and `h2` of `Σ gy·y + PENALTY(u)` for a run.
+    fn backward(&self, run: &Run, h2: &[f64], gy: &[f64]) -> (Vec<f64>, Vec<f64>) {
+        let gh2 = self.conv.filter_grad(&run.v, gy);
+        let gv = self.conv.correlate(gy, &self.conv.filter(h2));
+        let gu: Vec<f64> = gv.iter().zip(&run.u).map(|(g, &u)| g * saturation_slope(u) + penalty_grad(u, self.len)).collect();
+        let gh1 = self.conv.filter_grad(&self.x, &gu);
+        (gh1, gh2)
+    }
+
     /// The pedal's output for impulse responses `h1` (G1) and `h2` (G2), up to [`PEDAL_TAPS`] each.
     pub fn output(&self, h1: &[f64], h2: &[f64]) -> Vec<f64> {
         self.run(h1, h2).y
     }
 }
 
+/// Keeps the input of the saturation inside the range the curve was fitted on:
+/// `1e-3 · mean(max(|u| − 100, 0)²)`.
+const PENALTY_LIMIT: f64 = 100.0;
+const PENALTY_WEIGHT: f64 = 1e-3;
+
+fn penalty(u: &[f64]) -> f64 {
+    PENALTY_WEIGHT * u.iter().map(|v| (v.abs() - PENALTY_LIMIT).max(0.0).powi(2)).sum::<f64>() / u.len() as f64
+}
+
+fn penalty_grad(u: f64, len: usize) -> f64 {
+    PENALTY_WEIGHT * 2.0 * (u.abs() - PENALTY_LIMIT).max(0.0) * u.signum() / len as f64
+}
+
 /// The pedal's output for `x` with user AMP `data` (2048 floats as uploaded).
 pub fn simulate(data: &[f32], x: &[f64]) -> Vec<f64> {
     let (h1, h2) = super::convert::pedal_irs(data);
     Simulator::new(x).output(&h1, &h2)
+}
+
+// ---------------------------------------------------------------------------------------------
+// the filters: smooth curves → minimum-phase responses
+
+/// Control points of the filter curves: 41, a quarter octave apart from 20 Hz (to 20.48 kHz).
+pub const CURVE_POINTS: usize = 41;
+/// FFT length of the minimum-phase design (as the converter's).
+const MP_N: usize = 8192;
+const MP_BINS: usize = MP_N / 2 + 1;
+
+/// Control-point frequencies, as log10(Hz).
+fn control_points() -> [f64; CURVE_POINTS] {
+    std::array::from_fn(|i| 20f64.log10() + i as f64 * 2f64.log10() / 4.0)
+}
+
+/// log10 of each design bin's frequency (bin 0 counts as 1 mHz).
+fn bin_log_freqs() -> Vec<f64> {
+    (0..MP_BINS).map(|k| (k as f64 * SR as f64 / MP_N as f64).max(1e-3).log10()).collect()
+}
+
+/// Curves (natural-log magnitude at the control points) → minimum-phase impulse responses, and back.
+struct Curves {
+    /// Per design bin: the lower control point and the weight of the upper one (linear in
+    /// log-frequency, held outside the control points).
+    interp: Vec<(usize, f64)>,
+    fwd: Arc<dyn Fft<f64>>,
+    inv: Arc<dyn Fft<f64>>,
+}
+
+/// One design, with what the gradient needs.
+struct Design {
+    /// `exp(C)`, the minimum-phase spectrum (bins 0..=N/2).
+    e: Vec<Complex64>,
+    h: Vec<f64>,
+}
+
+impl Curves {
+    fn new() -> Self {
+        let cp = control_points();
+        let interp = bin_log_freqs()
+            .iter()
+            .map(|&lf| {
+                let i = (cp.partition_point(|&c| c < lf).max(1) - 1).min(CURVE_POINTS - 2);
+                (i, ((lf - cp[i]) / (cp[i + 1] - cp[i])).clamp(0.0, 1.0))
+            })
+            .collect();
+        let (fwd, inv) = plan(MP_N);
+        Curves { interp, fwd, inv }
+    }
+
+    /// Fold doubling the causal part of a real cepstrum.
+    fn fold(n: usize) -> f64 {
+        match n {
+            0 => 1.0,
+            n if n < MP_N / 2 => 2.0,
+            n if n == MP_N / 2 => 1.0,
+            _ => 0.0,
+        }
+    }
+
+    /// Curve → [`PEDAL_TAPS`]-tap minimum-phase impulse response: the log magnitude interpolated
+    /// over the design bins, folded cepstrum, `exp`, first taps.
+    fn design(&self, curve: &[f64]) -> Design {
+        let l: Vec<f64> = self.interp.iter().map(|&(i, t)| curve[i] * (1.0 - t) + curve[i + 1] * t).collect();
+        // real cepstrum of the (even) log magnitude, folded onto positive quefrencies
+        let mut c: Vec<Complex64> = (0..MP_N).map(|k| Complex64::new(l[k.min(MP_N - k)], 0.0)).collect();
+        self.inv.process(&mut c);
+        for (n, v) in c.iter_mut().enumerate() {
+            *v = Complex64::new(v.re / MP_N as f64 * Self::fold(n), 0.0);
+        }
+        self.fwd.process(&mut c);
+        let e: Vec<Complex64> = c[..MP_BINS].iter().map(|v| v.exp()).collect();
+        // real inverse transform of the half spectrum (the imaginary parts at DC and Nyquist are dropped)
+        let mut z = vec![Complex64::default(); MP_N];
+        z[0] = Complex64::new(e[0].re, 0.0);
+        z[MP_N / 2] = Complex64::new(e[MP_N / 2].re, 0.0);
+        for k in 1..MP_N / 2 {
+            z[k] = e[k];
+            z[MP_N - k] = e[k].conj();
+        }
+        self.inv.process(&mut z);
+        let h = z[..PEDAL_TAPS].iter().map(|v| v.re / MP_N as f64).collect();
+        Design { e, h }
+    }
+
+    /// Gradient w.r.t. the curve, given the gradient `gh` w.r.t. the response of `design`.
+    fn backward(&self, design: &Design, gh: &[f64]) -> Vec<f64> {
+        let n = MP_N as f64;
+        // through h = irfft(E)
+        let mut g = complex(gh, MP_N);
+        self.fwd.process(&mut g);
+        let mut z = vec![Complex64::default(); MP_N];
+        for k in 0..MP_BINS {
+            let ge = if k == 0 || k == MP_N / 2 { Complex64::new(g[k].re / n, 0.0) } else { g[k] * (2.0 / n) };
+            // through E = exp(C)
+            z[k] = ge * design.e[k].conj();
+        }
+        // through C = rfft(folded cepstrum), the fold, and the cepstrum = irfft(l)
+        self.inv.process(&mut z);
+        let mut gc: Vec<Complex64> = z.iter().enumerate().map(|(i, v)| Complex64::new(v.re * Self::fold(i), 0.0)).collect();
+        self.fwd.process(&mut gc);
+        let mut out = vec![0.0; CURVE_POINTS];
+        for (k, &(i, t)) in self.interp.iter().enumerate() {
+            let gl = gc[k].re * if k == 0 || k == MP_N / 2 { 1.0 } else { 2.0 } / n;
+            out[i] += gl * (1.0 - t);
+            out[i + 1] += gl * t;
+        }
+        out
+    }
+
+    /// The curve of an existing response: the mean natural-log magnitude within ±1/16 decade of
+    /// each control point.
+    fn of(&self, h: &[f64]) -> Vec<f64> {
+        let mut s = complex(h, MP_N);
+        self.fwd.process(&mut s);
+        let lf = bin_log_freqs();
+        control_points()
+            .iter()
+            .map(|&c| {
+                let (sum, n) = (0..MP_BINS)
+                    .filter(|&k| lf[k] >= c - 0.0625 && lf[k] < c + 0.0625)
+                    .fold((0.0, 0), |(a, n), k| (a + (s[k].norm() + 1e-9).ln(), n + 1));
+                sum / n as f64
+            })
+            .collect()
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -399,9 +590,8 @@ impl Resolution {
         }
     }
 
-    /// `|STFT(x)|`, frame-major (`frames × (n/2 + 1)`), as `torch.stft(center=True,
-    /// pad_mode="reflect")` with a periodic Hann window.
-    fn magnitude(&self, x: &[f64]) -> Vec<f64> {
+    /// The STFT (bins 0..=n/2), frame-major (`frames × (n/2 + 1)`).
+    fn stft(&self, x: &[f64]) -> Vec<Complex64> {
         let (len, bins) = (x.len(), self.n / 2 + 1);
         let mut out = Vec::with_capacity(self.frames(len) * bins);
         let mut buf = vec![Complex64::default(); self.n];
@@ -410,9 +600,29 @@ impl Resolution {
                 *b = Complex64::new(self.window[j] * x[self.source(f * self.hop + j, len)], 0.0);
             }
             self.fwd.process(&mut buf);
-            out.extend(buf[..bins].iter().map(|c| c.norm()));
+            out.extend_from_slice(&buf[..bins]);
         }
         out
+    }
+
+    /// The adjoint of [`Resolution::stft`]: adds to `gx` the gradient for STFT gradients `gs`.
+    fn stft_adjoint(&self, gs: &[Complex64], gx: &mut [f64]) {
+        let (len, bins) = (gx.len(), self.n / 2 + 1);
+        let mut buf = vec![Complex64::default(); self.n];
+        for (f, g) in gs.chunks_exact(bins).enumerate() {
+            buf.fill(Complex64::default());
+            buf[..bins].copy_from_slice(g);
+            self.inv.process(&mut buf);
+            for (j, b) in buf.iter().enumerate() {
+                gx[self.source(f * self.hop + j, len)] += self.window[j] * b.re;
+            }
+        }
+    }
+
+    /// `|STFT(x)|`, frame-major (`frames × (n/2 + 1)`), as `torch.stft(center=True,
+    /// pad_mode="reflect")` with a periodic Hann window.
+    fn magnitude(&self, x: &[f64]) -> Vec<f64> {
+        self.stft(x).iter().map(|c| c.norm()).collect()
     }
 }
 
@@ -443,6 +653,30 @@ impl SpecLoss {
             })
             .collect();
         SpecLoss { res, parts }
+    }
+
+    /// The loss of `y` and its gradient (added to `gy`).
+    fn value_grad(&self, y: &[f64], gy: &mut [f64]) -> f64 {
+        let scale = 1.0 / (self.parts.len() * self.res.len()) as f64;
+        let mut tot = 0.0;
+        for (a, b, eps, logs) in &self.parts {
+            for (r, t) in self.res.iter().zip(logs) {
+                let e = eps * (r.n as f64).sqrt();
+                let mut s = r.stft(&y[*a..*b]);
+                let k = scale / s.len() as f64;
+                let mut sum = 0.0;
+                for (c, t) in s.iter_mut().zip(t) {
+                    let m = c.norm();
+                    let d = (m + e).ln() - t;
+                    sum += d.abs();
+                    // d|d|/dS = sign(d) / (|S| + e) · S / |S|
+                    *c = if m > 0.0 { *c * (k * d.signum() / ((m + e) * m)) } else { Complex64::default() };
+                }
+                tot += sum / s.len() as f64;
+                r.stft_adjoint(&s, &mut gy[*a..*b]);
+            }
+        }
+        tot * scale
     }
 
     /// The loss of `y` (mean over segments and resolutions of the mean absolute log difference).
@@ -520,6 +754,123 @@ mod tests {
         let v = loss.value(&golden("sim_y"));
         let want = m["loss"].as_f64().unwrap();
         assert!((v - want).abs() < 1e-10 * want, "{v} vs {want}");
+    }
+
+    fn golden_slices() -> Vec<(usize, usize)> {
+        manifest()["sim_segs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| {
+                let (a, l) = (s[0].as_u64().unwrap() as usize, s[1].as_u64().unwrap() as usize);
+                (a + TRIM, a + l - TRIM)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn curve_of_matches_reference() {
+        let c = Curves::new();
+        for (h, want) in [("co_h1", "co_c1"), ("co_h2", "co_c2")] {
+            let ours = c.of(&golden(h));
+            assert!(rel_err(&ours, &golden(want)) < 1e-10, "{h}: {}", rel_err(&ours, &golden(want)));
+        }
+    }
+
+    #[test]
+    fn min_phase_design_and_gradient_match_reference() {
+        let c = Curves::new();
+        let d = c.design(&golden("mp_c"));
+        assert!(rel_err(&d.h, &golden("mp_h")) < 1e-10, "h {}", rel_err(&d.h, &golden("mp_h")));
+        let g = c.backward(&d, &golden("mp_gh"));
+        assert!(rel_err(&g, &golden("mp_gc")) < 1e-9, "grad {}", rel_err(&g, &golden("mp_gc")));
+    }
+
+    #[test]
+    fn min_phase_gradient_is_numerically_right() {
+        let c = Curves::new();
+        let curve: Vec<f64> = (0..CURVE_POINTS).map(|i| (i as f64 * 0.7).sin() - 2.0).collect();
+        let gh: Vec<f64> = (0..PEDAL_TAPS).map(|k| ((k * 37 % 101) as f64 / 50.0 - 1.0) / (1.0 + k as f64 / 20.0)).collect();
+        let f = |cv: &[f64]| c.design(cv).h.iter().zip(&gh).map(|(a, b)| a * b).sum::<f64>();
+        let g = c.backward(&c.design(&curve), &gh);
+        for i in [0, 1, 7, 20, 33, 40] {
+            let (mut p, mut m) = (curve.clone(), curve.clone());
+            p[i] += 1e-6;
+            m[i] -= 1e-6;
+            let num = (f(&p) - f(&m)) / 2e-6;
+            assert!((num - g[i]).abs() < 1e-6 * g.iter().fold(0f64, |a, v| a.max(v.abs())), "point {i}: {num} vs {}", g[i]);
+        }
+    }
+
+    #[test]
+    fn simulator_gradients_match_reference() {
+        let sim = Simulator::new(&golden("sim_x"));
+        let (h1, h2) = (golden("sim_h1"), golden("sim_h2"));
+        let run = sim.run(&h1, &h2);
+        let pen = penalty(&run.u);
+        let want = manifest()["sim_pen"].as_f64().unwrap();
+        assert!((pen - want).abs() < 1e-10 * want, "penalty {pen} vs {want}");
+        let (g1, g2) = sim.backward(&run, &h2, &golden("sim_gy"));
+        assert!(rel_err(&g1, &golden("sim_gh1")) < 1e-9, "h1 {}", rel_err(&g1, &golden("sim_gh1")));
+        assert!(rel_err(&g2, &golden("sim_gh2")) < 1e-9, "h2 {}", rel_err(&g2, &golden("sim_gh2")));
+    }
+
+    #[test]
+    fn simulator_gradients_are_numerically_right() {
+        // a signal that reaches the penalty range and several segments of the curve
+        let x: Vec<f64> = (0..30000).map(|n| 300.0 * (n as f64 * 0.013).sin() * (n as f64 / 30000.0)).collect();
+        let h1: Vec<f64> = (0..PEDAL_TAPS).map(|k| 0.5 * (-(k as f64) / 30.0).exp() * (k as f64 * 0.3).cos()).collect();
+        let h2: Vec<f64> = (0..PEDAL_TAPS).map(|k| (-(k as f64) / 50.0).exp() * (k as f64 * 0.1).sin()).collect();
+        let gy: Vec<f64> = (0..x.len()).map(|n| (n * 7919 % 1000) as f64 / 500.0 - 1.0).collect();
+        let sim = Simulator::new(&x);
+        let obj = |a: &[f64], b: &[f64]| {
+            let r = sim.run(a, b);
+            r.y.iter().zip(&gy).map(|(y, g)| y * g).sum::<f64>() + penalty(&r.u)
+        };
+        let run = sim.run(&h1, &h2);
+        assert!(run.u.iter().any(|u| u.abs() > PENALTY_LIMIT));
+        let (g1, g2) = sim.backward(&run, &h2, &gy);
+        let d = 1e-7;
+        for k in [0, 3, 100, 511] {
+            let (mut p, mut m) = (h1.clone(), h1.clone());
+            p[k] += d;
+            m[k] -= d;
+            let num = (obj(&p, &h2) - obj(&m, &h2)) / (2.0 * d);
+            assert!((num - g1[k]).abs() < 1e-4 * num.abs().max(1.0), "h1[{k}]: {num} vs {}", g1[k]);
+            let (mut p, mut m) = (h2.clone(), h2.clone());
+            p[k] += d;
+            m[k] -= d;
+            let num = (obj(&h1, &p) - obj(&h1, &m)) / (2.0 * d);
+            assert!((num - g2[k]).abs() < 1e-4 * num.abs().max(1.0), "h2[{k}]: {num} vs {}", g2[k]);
+        }
+    }
+
+    #[test]
+    fn loss_gradient_matches_reference() {
+        let loss = SpecLoss::new(&golden("sim_tgt"), &golden_slices());
+        let y = golden("sim_y");
+        let mut gy = vec![0.0; y.len()];
+        let v = loss.value_grad(&y, &mut gy);
+        assert!((v - loss.value(&y)).abs() < 1e-12);
+        assert!(rel_err(&gy, &golden("loss_gy")) < 1e-9, "{}", rel_err(&gy, &golden("loss_gy")));
+    }
+
+    #[test]
+    fn loss_gradient_is_numerically_right() {
+        let slices = golden_slices();
+        let loss = SpecLoss::new(&golden("sim_tgt"), &slices);
+        let y = golden("sim_y");
+        let mut gy = vec![0.0; y.len()];
+        loss.value_grad(&y, &mut gy);
+        // inside, at the edges (reflect padding) and outside the slices
+        for i in [slices[0].0, slices[0].0 + 1, slices[0].0 + 1000, slices[0].1 - 1, slices[1].0 + 3, 100] {
+            let d = 1e-6 * y[i].abs().max(1e-3);
+            let (mut p, mut m) = (y.clone(), y.clone());
+            p[i] += d;
+            m[i] -= d;
+            let num = (loss.value(&p) - loss.value(&m)) / (2.0 * d);
+            assert!((num - gy[i]).abs() < 1e-4 * num.abs().max(1e-6), "sample {i}: {num} vs {}", gy[i]);
+        }
     }
 
     #[test]
