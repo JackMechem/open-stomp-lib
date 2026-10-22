@@ -6,7 +6,7 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
-## [0.3.0] - Unreleased
+## [0.3.0] - 2026-10-21
 
 ### Added
 - `nam` feature and module (on by default): load and run Neural Amp Modeler `.nam` models (a
