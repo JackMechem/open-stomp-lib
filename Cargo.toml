@@ -6,7 +6,7 @@ default-members = ["."]
 
 [workspace.package]
 # one version for the crate and the Python package
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"

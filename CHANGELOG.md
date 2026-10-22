@@ -6,6 +6,8 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - Unreleased
+
 ### Added
 - `nam` feature and module (on by default): load and run Neural Amp Modeler `.nam` models (a
   pure-Rust port of NeuralAmpModelerCore's WaveNet, plain and `SlimmableContainer`; matches it to
@@ -92,6 +94,7 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JackMechem/open-stomp-lib/releases/tag/v0.1.0
