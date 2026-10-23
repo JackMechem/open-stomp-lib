@@ -15,7 +15,6 @@ site-url = "/open-stomp-lib/"
 default-theme = "light"
 preferred-dark-theme = "navy"
 additional-css = ["theme/extra.css"]
-no-section-label = true
 
 [output.html.fold]
 enable = true
