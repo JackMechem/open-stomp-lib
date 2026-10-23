@@ -440,7 +440,8 @@ Differences from USB:
 * Messages to the pedal go out at least 15 ms apart; an unpaced burst froze the pedal. A CC that only replaces the
   value of the CC queued just before it overwrites it, so dragging a slider never builds a backlog.
 * Replies take about 95 ms (40–240 ms), so the startup sync takes about 19 s instead of under a second.
-* The official app doesn't import NAM models or IRs over Bluetooth; nothing stops you, but it is untested.
+* NAM and IR imports work, though the official app doesn't offer them over Bluetooth: about 10 s per upload
+  instead of under one, since each of the ~62 chunks waits for its ack.
 * macOS asks for Bluetooth permission the first time (an app bundle needs `NSBluetoothAlwaysUsageDescription` in its
   `Info.plist`, or macOS kills it). If Bluetooth is off or refused the engine says so once and carries on with USB.
 

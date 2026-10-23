@@ -10,7 +10,8 @@ All notable changes to `open-stomp`. The format follows
 - Bluetooth (the pedal's Wireless setting), feature `ble`: the engine also scans for the pedal over BLE-MIDI
   (btleplug: CoreBluetooth, BlueZ, WinRT) and lists it as a port `"JME STOMPBOX (Bluetooth)"`, with no pairing.
   It works like USB: confirmed on the pedal for the full startup sync, effect on/off, parameters, volume, page,
-  preset switching, preset and settings writes, drum and looper (`examples/ble_check.rs`). Auto-connect prefers USB
+  preset switching, preset and settings writes, drum and looper (`examples/ble_check.rs`), and NAM and IR imports
+  (about 10 s each; the official app doesn't offer imports over Bluetooth). Auto-connect prefers USB
   and moves to USB when the pedal is plugged in. `Config::bluetooth` (default on) turns it off; Python
   `Device(bluetooth=...)`, which is built with `ble`. `is_ble_port`, `BLE_PORT_SUFFIX`.
 - `blemidi`: BLE-MIDI packet framing (encode with packing and SysEx splitting, decode with running status).

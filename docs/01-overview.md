@@ -34,7 +34,8 @@ same messages as over USB, only in BLE-MIDI framing. Confirmed on V1.1.1: the fu
 preset switching and acked SysEx writes (`examples/ble_check.rs`). Two differences: the pedal can't take unpaced
 bursts (61 CCs sent back to back froze it until a power cycle; the official app sends CCs ≥ 11 ms apart), and
 replies take 40–240 ms (median 95 ms) instead of about 1 ms, so the startup sync takes about 19 s. The official app
-doesn't import NAM models or IRs over Bluetooth. The separate classic-Bluetooth "headset" (A2DP/AVRCP) device is the
+doesn't import NAM models or IRs over Bluetooth, but the pedal takes them: a NAM import (62 acked writes) took 10.5 s
+and an IR import 12.4 s, and both slot names read back. The separate classic-Bluetooth "headset" (A2DP/AVRCP) device is the
 pedal's Bluetooth audio, not MIDI.
 
 ## Protocol in one paragraph

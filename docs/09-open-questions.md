@@ -35,8 +35,8 @@ Ordered by usefulness for a Linux editor. Each item says how to resolve it.
 
 ## Low / out of scope
 
-13. ~~BLE-MIDI: same messages over BLE?~~ Yes, identical (docs/01). Open: whether NAM/IR uploads work over BLE
-    (the official app doesn't offer them; untested), and the fastest safe pacing (15 ms works).
+13. ~~BLE-MIDI: same messages over BLE?~~ Yes, identical (docs/01), NAM/IR uploads included (the official app
+    doesn't offer them). Open: the fastest safe pacing (15 ms works).
 14. Import/export/backup file formats of the official app (`.bin`, preset import list dialog). Not captured.
 15. Firmware DFU over USB HID (separate updater). Deliberately not explored.
 16. The legacy "Syx/Cherub" header `43 58 70 7E` seen in static analysis: never observed from this pedal.
