@@ -164,9 +164,18 @@ impl Device {
     /// * `sync`: may send anything (startup reads and edits); `False` = listen only
     /// * `reply_timeout`: seconds a SysEx request waits for its reply
     /// * `scan_interval`: seconds between MIDI port rescans (hotplug)
+    /// * `bluetooth`: also find the pedal over Bluetooth LE MIDI (the pedal's Wireless setting);
+    ///   it shows up as a port ending in " (Bluetooth)"
     #[new]
-    #[pyo3(signature = (*, client_name = "Open Stomp", auto_connect = true, sync = true, reply_timeout = 1.0, scan_interval = 1.5))]
-    fn new(client_name: &str, auto_connect: bool, sync: bool, reply_timeout: f64, scan_interval: f64) -> PyResult<Self> {
+    #[pyo3(signature = (*, client_name = "Open Stomp", auto_connect = true, sync = true, reply_timeout = 1.0, scan_interval = 1.5, bluetooth = true))]
+    fn new(
+        client_name: &str,
+        auto_connect: bool,
+        sync: bool,
+        reply_timeout: f64,
+        scan_interval: f64,
+        bluetooth: bool,
+    ) -> PyResult<Self> {
         if !(reply_timeout > 0.0 && scan_interval > 0.0) {
             return Err(PyValueError::new_err("reply_timeout and scan_interval must be positive"));
         }
@@ -176,6 +185,7 @@ impl Device {
             sync,
             reply_timeout: Duration::from_secs_f64(reply_timeout),
             scan_interval: Duration::from_secs_f64(scan_interval),
+            bluetooth,
         };
         Ok(Device { inner: Mutex::new(Some(dev::Device::spawn(config))) })
     }

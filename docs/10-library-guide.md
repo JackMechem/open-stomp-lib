@@ -37,9 +37,10 @@ open-stomp = { path = "../open-stomp-lib", default-features = false }
 |---|---|---|
 | `device` | on | `open_stomp::device`: the engine thread (midir: ALSA on Linux, CoreMIDI on macOS, WinMM on Windows) |
 | `nam` | on | `open_stomp::nam`: run `.nam` models and convert them for the pedal (`serde_json`, `rustfft`) |
+| `ble` | off | The engine also finds the pedal over Bluetooth LE MIDI ([Bluetooth](#bluetooth); btleplug, tokio) |
 
-Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers (`libasound2-dev` / `alsa-lib-devel`); macOS and
-Windows need nothing extra. The pedal is class compliant, so no driver is needed anywhere.
+Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers (`libasound2-dev` / `alsa-lib-devel`) and `ble`
+needs the D-Bus headers (`libdbus-1-dev` / `dbus-devel`) and BlueZ; macOS and Windows need nothing extra. The pedal is class compliant, so no driver is needed anywhere.
 
 ## Layers and modules
 
@@ -114,6 +115,7 @@ for you beyond what pacing needs. That is `DeviceState`'s job, in your thread.
 | `sync` | `true` | May send anything at all (startup reads and edits). `false` = listen only |
 | `reply_timeout` | 1 s | How long a SysEx request waits for its reply/ack before the queue moves on |
 | `scan_interval` | 1.5 s | Port rescan period (hotplug detection) |
+| `bluetooth` | `true` | Also look for the pedal over Bluetooth (feature `ble`; ignored without it) |
 
 ### Commands
 
@@ -377,8 +379,8 @@ the value as the official app shows it. `Module::from_param_cc(cc)` maps a CC ba
 
 ## Bring your own transport
 
-Without the `device` feature (or with a transport midir doesn't cover, such as BLE-MIDI or a web page), drive the
-pure pieces yourself:
+Without the `device` feature (or with a transport the engine doesn't cover, such as a web page), drive the pure
+pieces yourself (`blemidi` has the BLE-MIDI framing):
 
 ```rust
 use std::time::{Duration, Instant};
@@ -425,6 +427,24 @@ messages as `Entry::Message { ms, origin, bytes }` / `Entry::Mark { ms, text }`.
 cargo run --example monitor -- --replay captures/logs/01-main-session.log --speed 8
 cargo run --example decode -- captures/logs/01-main-session.log          # instant, no engine
 ```
+
+### Bluetooth
+
+With feature `ble` and the pedal's **Wireless** setting on, the engine also scans for the pedal over Bluetooth LE
+MIDI. No pairing is needed. A pedal in range is listed in `Update::Ports` as `"JME STOMPBOX (Bluetooth)"`
+(`open_stomp::is_ble_port`), and from there it works like a USB port: `connect`, sync, edits, uploads. Auto-connect
+prefers USB, and moves to USB when the pedal is plugged in while connected over Bluetooth. A dropped link reports
+"Bluetooth connection lost" and auto-connect reconnects once the pedal advertises again.
+
+Differences from USB:
+* Messages to the pedal go out at least 15 ms apart; an unpaced burst froze the pedal. A CC that only replaces the
+  value of the CC queued just before it overwrites it, so dragging a slider never builds a backlog.
+* Replies take about 95 ms (40–240 ms), so the startup sync takes about 19 s instead of under a second.
+* The official app doesn't import NAM models or IRs over Bluetooth; nothing stops you, but it is untested.
+* macOS asks for Bluetooth permission the first time (an app bundle needs `NSBluetoothAlwaysUsageDescription` in its
+  `Info.plist`, or macOS kills it). If Bluetooth is off or refused the engine says so once and carries on with USB.
+
+`cargo run --features ble --example ble_check` exercises all of it against a pedal and puts everything back.
 
 ## Threading, timing and platform notes
 

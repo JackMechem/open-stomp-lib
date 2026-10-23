@@ -28,8 +28,14 @@ need no kernel driver, no libusb and no udev rule beyond ALSA access. The device
 Firmware updates are different: they use a separate NUX "Device Firmware Updater" over USB **HID** in DFU mode. That
 is out of scope here.
 
-Bluetooth: the pedal also speaks BLE-MIDI (service `03b80e5a-ede8-4b33-a751-6ce34ec4c700`, characteristic
-`7772e5db-3868-4112-a1a9-f2669d106bf3`), presumably with the same messages. Untested.
+Bluetooth: with **Wireless** on, the pedal also speaks BLE-MIDI as "JME STOMPBOX" (service
+`03b80e5a-ede8-4b33-a751-6ce34ec4c700`, characteristic `7772e5db-3868-4112-a1a9-f2669d106bf3`), with exactly the
+same messages as over USB, only in BLE-MIDI framing. Confirmed on V1.1.1: the full startup sync, every live control,
+preset switching and acked SysEx writes (`examples/ble_check.rs`). Two differences: the pedal can't take unpaced
+bursts (61 CCs sent back to back froze it until a power cycle; the official app sends CCs ≥ 11 ms apart), and
+replies take 40–240 ms (median 95 ms) instead of about 1 ms, so the startup sync takes about 19 s. The official app
+doesn't import NAM models or IRs over Bluetooth. The separate classic-Bluetooth "headset" (A2DP/AVRCP) device is the
+pedal's Bluetooth audio, not MIDI.
 
 ## Protocol in one paragraph
 

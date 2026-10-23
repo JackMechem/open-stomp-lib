@@ -20,7 +20,7 @@ Guide: https://github.com/JackMechem/open-stomp-lib/blob/main/docs/11-python-gui
 import sys as _sys
 
 from . import _native
-from ._native import USB_ID, __version__, is_stomp_port
+from ._native import USB_ID, __version__, is_ble_port, is_stomp_port
 
 # Expose the extension's submodules as real modules, so `import open_stomp.midi` and
 # `from open_stomp.midi.host import cc` work like any package.
@@ -44,6 +44,7 @@ from .state import DeviceState, Event, Origin  # noqa: E402
 __all__ = [
     "USB_ID",
     "__version__",
+    "is_ble_port",
     "is_stomp_port",
     "pack",
     "midi",

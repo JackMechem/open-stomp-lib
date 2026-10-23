@@ -6,6 +6,24 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Added
+- Bluetooth (the pedal's Wireless setting), feature `ble`: the engine also scans for the pedal over BLE-MIDI
+  (btleplug: CoreBluetooth, BlueZ, WinRT) and lists it as a port `"JME STOMPBOX (Bluetooth)"`, with no pairing.
+  It works like USB: confirmed on the pedal for the full startup sync, effect on/off, parameters, volume, page,
+  preset switching, preset and settings writes, drum and looper (`examples/ble_check.rs`). Auto-connect prefers USB
+  and moves to USB when the pedal is plugged in. `Config::bluetooth` (default on) turns it off; Python
+  `Device(bluetooth=...)`, which is built with `ble`. `is_ble_port`, `BLE_PORT_SUFFIX`.
+- `blemidi`: BLE-MIDI packet framing (encode with packing and SysEx splitting, decode with running status).
+
+### Changed
+- Messages to a Bluetooth pedal go out at least 15 ms apart, and a CC replacing the one queued just before it
+  overwrites it: an unpaced burst of 61 CCs froze the pedal until a power cycle.
+- On Linux, `ble` needs the D-Bus headers (`libdbus-1-dev`); CI and the Linux wheel install them.
+
+### Fixed
+- The edit-buffer read (`0x0C`) is padded with 14 zero bytes like the official app's. A bare request made the pedal
+  take its parameters from whatever the previous message left in its buffer, giving empty or truncated replies.
+
 ## [0.5.1] - 2026-10-22
 
 ### Added

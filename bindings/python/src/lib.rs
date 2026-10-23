@@ -32,12 +32,19 @@ fn is_stomp_port(name: &str) -> bool {
     open_stomp::is_stomp_port(name)
 }
 
+/// Whether a port name is a pedal found over Bluetooth (ends in " (Bluetooth)").
+#[pyfunction]
+fn is_ble_port(name: &str) -> bool {
+    open_stomp::is_ble_port(name)
+}
+
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     let py = m.py();
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add("USB_ID", open_stomp::USB_ID)?;
     m.add_function(wrap_pyfunction!(is_stomp_port, m)?)?;
+    m.add_function(wrap_pyfunction!(is_ble_port, m)?)?;
     submodule(m, "pack", midi::register_pack)?;
     submodule(m, "midi", |md| midi::register(py, md))?;
     submodule(m, "catalog", catalog::register)?;

@@ -13,6 +13,7 @@ name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-open-stomp = { path = "../.." }
+# Bluetooth LE MIDI too (on Linux this needs the D-Bus headers, libdbus-1-dev)
+open-stomp = { path = "../..", features = ["ble"] }
 # one wheel per platform for every CPython >= 3.9 (stable ABI)
 pyo3 = { version = "0.30", features = ["abi3-py39"] }

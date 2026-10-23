@@ -1,6 +1,10 @@
 //! Background engine (feature `device`): owns the MIDI connection (or a capture replay), finds
 //! and connects to the pedal, performs the startup sync, sends edits and reports every message.
 //!
+//! With feature `ble` the engine also finds the pedal over Bluetooth LE MIDI (the pedal's
+//! Wireless setting). A Bluetooth pedal is listed as a port named `"<name> (Bluetooth)"` and
+//! behaves like a USB one; auto-connect prefers USB when both are there.
+//!
 //! [`Device::spawn`] starts the engine on its own thread and returns a [`Device`] handle. Send it
 //! [`Command`]s (or use the helper methods) and read [`Update`]s from it. The engine only moves
 //! bytes; apply [`Update::Message`]s to a [`DeviceState`](crate::DeviceState) to follow the
@@ -22,13 +26,15 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use midir::{Ignore, MidiInput, MidiInputConnection, MidiOutput, MidiOutputConnection};
 
+#[cfg(feature = "ble")]
+use crate::ble::{self, Ble};
 use crate::capture::{self, Entry};
 use crate::catalog::Module;
 use crate::midi::{Msg, hex, host, req};
 use crate::queue::{RequestQueue, follow_up, handshake};
 use crate::records::{Preset, Settings};
 use crate::upload::{self, UploadError, UserAmpInfo};
-use crate::{Assembler, Origin, is_stomp_port};
+use crate::{Assembler, Origin, is_ble_port, is_stomp_port};
 
 /// Engine settings.
 #[derive(Clone, Debug)]
@@ -44,6 +50,8 @@ pub struct Config {
     pub reply_timeout: Duration,
     /// How often to rescan the MIDI ports (hotplug).
     pub scan_interval: Duration,
+    /// Also look for the pedal over Bluetooth LE MIDI. Needs feature `ble`; ignored without it.
+    pub bluetooth: bool,
 }
 
 impl Default for Config {
@@ -54,6 +62,7 @@ impl Default for Config {
             sync: true,
             reply_timeout: Duration::from_secs(1),
             scan_interval: Duration::from_millis(1500),
+            bluetooth: true,
         }
     }
 }
@@ -109,6 +118,8 @@ pub enum Update {
 enum Internal {
     Cmd(Command),
     Input(Vec<u8>),
+    #[cfg(feature = "ble")]
+    Ble(ble::Event),
     Shutdown,
 }
 
@@ -399,8 +410,17 @@ impl Drop for Device {
 
 struct Connection {
     port: String,
-    _input: MidiInputConnection<()>,
-    output: Option<MidiOutputConnection>,
+    link: Link,
+}
+
+enum Link {
+    Midi {
+        _input: MidiInputConnection<()>,
+        output: Option<MidiOutputConnection>,
+    },
+    /// The [`Ble`] link thread owns the connection.
+    #[cfg(feature = "ble")]
+    Ble,
 }
 
 struct Engine {
@@ -415,12 +435,19 @@ struct Engine {
     replay: Option<Arc<AtomicBool>>,
     asm: Assembler,
     queue: RequestQueue,
+    #[cfg(feature = "ble")]
+    ble: Option<Ble>,
+    /// Pedals in Bluetooth range, as port names.
+    #[cfg(feature = "ble")]
+    ble_ports: Vec<String>,
 }
 
 impl Engine {
     fn new(config: Config, out: Sender<Update>, self_tx: Sender<Internal>, wake: Waker) -> Self {
         let scanner = MidiInput::new(&format!("{} scan", config.client_name)).ok();
         let queue = RequestQueue::new(config.reply_timeout);
+        #[cfg(feature = "ble")]
+        let ble = config.bluetooth.then(|| Ble::spawn(ble::forward(self_tx.clone(), Internal::Ble)));
         Engine {
             config,
             out,
@@ -433,6 +460,10 @@ impl Engine {
             replay: None,
             asm: Assembler::default(),
             queue,
+            #[cfg(feature = "ble")]
+            ble,
+            #[cfg(feature = "ble")]
+            ble_ports: vec![],
         }
     }
 
@@ -458,6 +489,8 @@ impl Engine {
             match rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(Internal::Cmd(c)) => self.command(c),
                 Ok(Internal::Input(data)) => self.input(&data),
+                #[cfg(feature = "ble")]
+                Ok(Internal::Ble(e)) => self.ble_event(e),
                 Ok(Internal::Shutdown) | Err(RecvTimeoutError::Disconnected) => break,
                 Err(RecvTimeoutError::Timeout) => {}
             }
@@ -523,8 +556,12 @@ impl Engine {
 
     fn scan(&mut self) {
         self.last_scan = Some(Instant::now());
-        let Some(scanner) = &self.scanner else { return };
-        let ports: Vec<String> = scanner.ports().iter().filter_map(|p| scanner.port_name(p).ok()).collect();
+        let mut ports: Vec<String> = match &self.scanner {
+            Some(s) => s.ports().iter().filter_map(|p| s.port_name(p).ok()).collect(),
+            None => vec![],
+        };
+        #[cfg(feature = "ble")]
+        ports.extend(self.ble_ports.iter().cloned());
         if ports != self.ports {
             self.ports = ports.clone();
             self.emit(Update::Ports(ports.clone()));
@@ -537,14 +574,59 @@ impl Engine {
         if self.conn.is_none()
             && self.replay.is_none()
             && self.config.auto_connect
-            && let Some(p) = ports.iter().find(|p| is_stomp_port(p))
+            && let Some(p) = ports
+                .iter()
+                .find(|p| is_stomp_port(p) && !is_ble_port(p))
+                .or_else(|| ports.iter().find(|p| is_stomp_port(p)))
+        {
+            self.connect(&p.clone());
+        }
+        // the pedal was plugged in while connected over Bluetooth: move to USB
+        if self.config.auto_connect
+            && self.conn.as_ref().is_some_and(|c| is_ble_port(&c.port))
+            && let Some(p) = ports.iter().find(|p| is_stomp_port(p) && !is_ble_port(p))
         {
             self.connect(&p.clone());
         }
     }
 
+    #[cfg(feature = "ble")]
+    fn ble_event(&mut self, e: ble::Event) {
+        match e {
+            ble::Event::Ports(p) => {
+                self.ble_ports = p;
+                self.scan();
+            }
+            ble::Event::Input(bytes) => {
+                if self.conn.as_ref().is_some_and(|c| matches!(c.link, Link::Ble)) {
+                    self.input(&bytes);
+                }
+            }
+            ble::Event::Lost => {
+                if self.conn.as_ref().is_some_and(|c| matches!(c.link, Link::Ble)) {
+                    self.disconnect("Bluetooth connection lost");
+                }
+            }
+            ble::Event::Unavailable(why) => {
+                self.ble = None;
+                self.info(format!("Bluetooth is unavailable: {why}"), false);
+            }
+        }
+    }
+
     fn connect(&mut self, port_name: &str) {
         self.disconnect_quiet();
+        #[cfg(feature = "ble")]
+        if is_ble_port(port_name)
+            && let Some(ble) = &self.ble
+        {
+            self.info(format!("Connecting to {port_name} …"), false);
+            match ble.connect(port_name) {
+                Ok(()) => self.connected(Connection { port: port_name.to_owned(), link: Link::Ble }),
+                Err(e) => self.info(format!("Could not connect: {e}"), true),
+            }
+            return;
+        }
         let result = (|| -> Result<Connection, String> {
             let mut input = MidiInput::new(&self.config.client_name).map_err(|e| e.to_string())?;
             input.ignore(Ignore::None);
@@ -565,26 +647,34 @@ impl Engine {
                 )
                 .map_err(|e| e.to_string())?;
             let output = open_output(&self.config.client_name, port_name);
-            Ok(Connection { port: port_name.to_owned(), _input: input, output })
+            Ok(Connection { port: port_name.to_owned(), link: Link::Midi { _input: input, output } })
         })();
         match result {
-            Ok(c) => {
-                let output = c.output.is_some();
-                let port = c.port.clone();
-                self.conn = Some(c);
-                self.emit(Update::Reset);
-                self.emit(Update::Status(Status::Connected { port: port.clone(), output }));
-                self.info(format!("Connected to {port}"), false);
-                if !output {
-                    self.info("No MIDI output to the pedal: listening only", true);
-                }
-                self.start_sync();
-            }
+            Ok(c) => self.connected(c),
             Err(e) => self.info(format!("Could not connect: {e}"), true),
         }
     }
 
+    fn connected(&mut self, c: Connection) {
+        let port = c.port.clone();
+        self.conn = Some(c);
+        let output = self.has_output();
+        self.emit(Update::Reset);
+        self.emit(Update::Status(Status::Connected { port: port.clone(), output }));
+        self.info(format!("Connected to {port}"), false);
+        if !output {
+            self.info("No MIDI output to the pedal: listening only", true);
+        }
+        self.start_sync();
+    }
+
     fn disconnect_quiet(&mut self) {
+        #[cfg(feature = "ble")]
+        if let Some(Connection { link: Link::Ble, .. }) = self.conn
+            && let Some(ble) = &self.ble
+        {
+            ble.disconnect();
+        }
         self.conn = None;
         self.queue.clear();
         self.asm = Assembler::default();
@@ -600,7 +690,11 @@ impl Engine {
     }
 
     fn has_output(&self) -> bool {
-        self.conn.as_ref().is_some_and(|c| c.output.is_some())
+        self.conn.as_ref().is_some_and(|c| match &c.link {
+            Link::Midi { output, .. } => output.is_some(),
+            #[cfg(feature = "ble")]
+            Link::Ble => true,
+        })
     }
 
     fn start_sync(&mut self) {
@@ -623,8 +717,16 @@ impl Engine {
 
     /// Send one message now and report it. The pedal never echoes host messages.
     fn transmit(&mut self, bytes: &[u8]) -> bool {
-        let Some(out) = self.conn.as_mut().and_then(|c| c.output.as_mut()) else { return false };
-        if let Err(e) = out.send(bytes) {
+        let sent = match self.conn.as_mut().map(|c| &mut c.link) {
+            Some(Link::Midi { output: Some(out), .. }) => out.send(bytes).map_err(|e| e.to_string()),
+            #[cfg(feature = "ble")]
+            Some(Link::Ble) => match &self.ble {
+                Some(ble) if ble.send(vec![bytes.to_vec()]) => Ok(()),
+                _ => Err("Bluetooth stopped".into()),
+            },
+            _ => return false,
+        };
+        if let Err(e) = sent {
             self.info(format!("Send failed: {e}"), true);
             return false;
         }

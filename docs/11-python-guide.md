@@ -70,7 +70,7 @@ live edits, back up, and save presets/settings (with confirmation). `-c CMD` run
 sync and reports everything as `Update`s.
 
 ```python
-Device(*, client_name="Open Stomp", auto_connect=True, sync=True, reply_timeout=1.0, scan_interval=1.5)
+Device(*, client_name="Open Stomp", auto_connect=True, sync=True, reply_timeout=1.0, scan_interval=1.5, bluetooth=True)
 ```
 
 | Argument | Meaning |
@@ -80,6 +80,7 @@ Device(*, client_name="Open Stomp", auto_connect=True, sync=True, reply_timeout=
 | `sync` | May send anything at all (startup reads and edits). `False` = listen only |
 | `reply_timeout` | Seconds a SysEx request waits for its reply before the queue moves on |
 | `scan_interval` | Seconds between port rescans (hotplug) |
+| `bluetooth` | Also find the pedal over Bluetooth LE MIDI (its Wireless setting): it appears as a port `"JME STOMPBOX (Bluetooth)"` (`is_ble_port(name)`) and works like USB, with slower replies (sync about 19 s). Auto-connect prefers USB. See the [library guide](10-library-guide.md#bluetooth) |
 
 Receiving:
 

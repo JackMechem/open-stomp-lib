@@ -29,17 +29,24 @@ include = ["src/", "examples/", "tests/", "docs/", "captures/logs/", "README.md"
 name = "open_stomp"
 
 [features]
-default = ["device", "nam"]
+default = ["device", "ble", "nam"]
 # MIDI I/O: port discovery, auto-connect, handshake, request pacing, capture replay (midir).
 # Without it the crate is pure encode/decode with no dependencies.
 device = ["dep:midir", "dep:core-foundation-sys"]
 # Neural Amp Modeler: load .nam files and run them (needed to convert NAM models for the pedal).
 nam = ["dep:serde_json", "dep:rustfft"]
+# Bluetooth LE MIDI (the pedal's "Wireless" setting): the engine also finds and connects to the
+# pedal over Bluetooth (btleplug: CoreBluetooth, BlueZ, WinRT).
+ble = ["device", "dep:btleplug", "dep:tokio", "dep:futures-util", "dep:uuid"]
 
 [dependencies]
 midir = { version = "0.11", optional = true }
 serde_json = { version = "1", optional = true }
 rustfft = { version = "6", optional = true }
+btleplug = { version = "0.13", optional = true }
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"], optional = true }
+futures-util = { version = "0.3", optional = true }
+uuid = { version = "1", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # pump the engine thread's run loop so CoreMIDI can deliver device add/remove notifications
@@ -48,6 +55,10 @@ core-foundation-sys = { version = "0.8", optional = true }
 [[example]]
 name = "monitor"
 required-features = ["device"]
+
+[[example]]
+name = "ble_check"
+required-features = ["ble"]
 
 [[example]]
 name = "ports"

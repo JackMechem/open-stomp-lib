@@ -40,6 +40,9 @@
 //! Tested against the Dual Stomp Lite on firmware V1.1.1. The capture logs in `captures/logs/`
 //! are the test vectors.
 
+#[cfg(feature = "ble")]
+mod ble;
+pub mod blemidi;
 pub mod capture;
 pub mod catalog;
 pub mod ir;
@@ -69,6 +72,15 @@ pub fn is_stomp_port(name: &str) -> bool {
     n.contains("JME") || n.contains("SORAN") || n.contains("STOMPBOX")
 }
 
+/// Suffix of the port name the engine gives a pedal found over Bluetooth LE MIDI (feature `ble`):
+/// `"JME STOMPBOX (Bluetooth)"`.
+pub const BLE_PORT_SUFFIX: &str = " (Bluetooth)";
+
+/// Whether a port name is a pedal found over Bluetooth (see [`BLE_PORT_SUFFIX`]).
+pub fn is_ble_port(name: &str) -> bool {
+    name.ends_with(BLE_PORT_SUFFIX)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -77,5 +89,7 @@ mod tests {
             assert!(super::is_stomp_port(n), "{n}");
         }
         assert!(!super::is_stomp_port("IAC Driver Bus 1"));
+        assert!(super::is_stomp_port("JME STOMPBOX (Bluetooth)") && super::is_ble_port("JME STOMPBOX (Bluetooth)"));
+        assert!(!super::is_ble_port("JME STOMPBOX MIDI 1"));
     }
 }

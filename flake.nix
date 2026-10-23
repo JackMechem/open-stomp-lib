@@ -17,7 +17,7 @@
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = lib.optionals isLinux [ pkgs.alsa-lib ];
+          buildInputs = lib.optionals isLinux [ pkgs.alsa-lib pkgs.dbus ]; # dbus: Bluetooth (feature `ble`)
           nativeBuildInputs =
             (with pkgs; [
               pkg-config

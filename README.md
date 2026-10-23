@@ -29,6 +29,8 @@ cross-platform editor, is built on it.
   (`Device::import_ir_file`), or convert it exactly like the official app.
 * **Run the connection** (feature `device`): find the pedal, connect, follow hotplug, perform the official app's
   startup sync, send edits, report everything. It can also replay a capture log so you can develop without a pedal.
+* **Wireless** (feature `ble`): the same over Bluetooth LE MIDI, with no pairing; the pedal shows up as
+  `"JME STOMPBOX (Bluetooth)"`.
 
 The protocol layer has no I/O and no dependencies. The device layer uses [`midir`](https://crates.io/crates/midir)
 (ALSA, CoreMIDI, WinMM); the NAM layer uses `serde_json` and `rustfft`.
@@ -241,7 +243,8 @@ nix develop                        # optional dev shell: cargo, rust-analyzer, A
 cd bindings/python && maturin develop && pytest   # Python bindings (pip install maturin pytest)
 ```
 
-Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers (`libasound2-dev` / `alsa-lib-devel`). CI runs on
+Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers (`libasound2-dev` / `alsa-lib-devel`), and `ble` the
+D-Bus headers (`libdbus-1-dev` / `dbus-devel`). CI runs on
 Linux, macOS and Windows.
 
 ### Versioning and releases

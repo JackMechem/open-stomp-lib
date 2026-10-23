@@ -1,6 +1,6 @@
 import pytest
 
-from open_stomp import Assembler, Module, Msg, Preset, Settings, is_stomp_port, pack
+from open_stomp import Assembler, Module, Msg, Preset, Settings, is_ble_port, is_stomp_port, pack
 from open_stomp.catalog import NOTES, drum_pattern_name
 from open_stomp.midi import hex, host, req
 from open_stomp.records import DEFAULT_CHAIN, PRESET_LEN
@@ -62,6 +62,7 @@ def test_catalog():
     assert NOTES[9] == "A"
     assert {Module.AMP: 1}[Module.AMP] == 1  # hashable
     assert is_stomp_port("JME STOMPBOX MIDI 1") and not is_stomp_port("IAC Driver Bus 1")
+    assert is_ble_port("JME STOMPBOX (Bluetooth)") and not is_ble_port("JME STOMPBOX MIDI 1")
 
 
 def test_preset_encode_patches_fields():

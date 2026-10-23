@@ -61,8 +61,8 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist
           manylinux: "2_28"
-          # midir links ALSA on Linux
-          before-script-linux: dnf install -y alsa-lib-devel
+          # midir links ALSA on Linux, btleplug (Bluetooth) links D-Bus
+          before-script-linux: dnf install -y alsa-lib-devel dbus-devel
       - name: Smoke test
         shell: bash
         run: |
