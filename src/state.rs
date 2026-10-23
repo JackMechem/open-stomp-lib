@@ -551,7 +551,7 @@ impl DeviceState {
                     ev.value = format!("USER AMP {:02} · {}", info.slot + 1, info.name);
                     if host_write {
                         ev.category = Category::Effect(Module::Amp);
-                        ev.subject = "User AMP import".into();
+                        ev.subject = "User AMP slot".into();
                     }
                     if let Some(s) = self.user_amps.get_mut(info.slot as usize) {
                         *s = Some(info.name);

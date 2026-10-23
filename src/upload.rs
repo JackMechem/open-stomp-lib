@@ -316,4 +316,20 @@ mod tests {
         assert_eq!(p, UserAmpInfo { raw: i.to_raw(), ..i });
         assert_eq!(hex(&user_amp_delete(0)), "F0 00 21 7A 70 58 01 00 00 18 00 00 00 00 00 00 00 00 00 00 00 F7");
     }
+
+    /// A rename is the import's name record on its own: the AMP slot-info write that starts an
+    /// import, the IR name write that ends one (`Device::rename_user_amp` / `rename_user_ir`).
+    #[test]
+    fn rename_is_the_imports_name_record() {
+        let data = vec![0.25f32; UPLOAD_FLOATS];
+        let amp = user_amp_upload(&UserAmpInfo::new(4, "SVT G10 .5", 1.0), &data);
+        assert_eq!(UserAmpInfo::new(4, "SVT G10 .5", 1.0).write_frame(), amp[0]);
+        let ir = user_ir_upload(7, "SVT Neumann .5", &data);
+        assert_eq!(&user_ir_name(7, "SVT Neumann .5"), ir.last().unwrap());
+        // over-long and non-ASCII names: cut to 31 characters, '?' for anything else
+        let frame = UserAmpInfo::new(0, &"é".repeat(40), 1.0).write_frame();
+        let Msg::Nep { payload, .. } = Msg::parse(&frame) else { panic!() };
+        assert_eq!(UserAmpInfo::parse(&payload).unwrap().name, "?".repeat(31));
+    }
+
 }

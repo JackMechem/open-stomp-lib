@@ -218,6 +218,8 @@ for long or delayed IRs ([05](05-uploads-nam-ir.md#optimised-ir-conversion)); it
 dev.import_user_amp(2, "Jcm800", floats)      # 2048 floats -> USER AMP 03 (factor=1.0 by default)
 dev.import_user_ir(0, "My Cab", floats)       # USER IR 01
 dev.delete_user_amp(2)
+dev.rename_user_amp(2, "Marshall JCM800")     # only the name; the sound stays as it is
+dev.rename_user_ir(0, "SVT 8x10 57")
 ```
 
 `nam.convert` and `ir.convert` make the 2048 floats from `.nam` and `.wav` files; a captured

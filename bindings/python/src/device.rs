@@ -386,11 +386,27 @@ impl Device {
         d.delete_user_amp(slot).map_err(crate::upload::err)
     }
 
+    /// Rename user AMP `slot` (0–9) without touching its sound (writes only the name record, then
+    /// re-reads it). Names are cut to 31 characters.
+    fn rename_user_amp(&self, slot: u8, name: &str) -> PyResult<()> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.rename_user_amp(slot, name).map_err(crate::upload::err)
+    }
+
     /// Import IR data (2048 floats) into user IR `slot` (0–9) like the official app.
     fn import_user_ir(&self, slot: u8, name: &str, data: Vec<f32>) -> PyResult<()> {
         let g = self.lock();
         let d = g.as_ref().ok_or_else(closed)?;
         d.import_user_ir(slot, name, &data).map_err(crate::upload::err)
+    }
+
+    /// Rename user IR `slot` (0–9) without touching its sound (writes only the name record, then
+    /// re-reads it). Names are cut to 31 characters.
+    fn rename_user_ir(&self, slot: u8, name: &str) -> PyResult<()> {
+        let g = self.lock();
+        let d = g.as_ref().ok_or_else(closed)?;
+        d.rename_user_ir(slot, name).map_err(crate::upload::err)
     }
 
     /// Convert an IR WAV file and import it into user IR `slot` (0–9), named after the file

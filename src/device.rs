@@ -311,6 +311,18 @@ impl Device {
         Ok(())
     }
 
+    /// Rename user AMP `slot` (0–9) without touching its sound: write only the slot-info record
+    /// (the import's first step, factor 1.0 like every import) with the new name, then re-read it.
+    /// The official app has no rename; this was confirmed on the pedal (the slot's response is
+    /// unchanged within 0.1 dB, docs/05). Names are cut to 31 characters.
+    pub fn rename_user_amp(&self, slot: u8, name: &str) -> Result<(), UploadError> {
+        if slot >= upload::USER_SLOTS {
+            return Err(UploadError::Slot(slot));
+        }
+        self.write(vec![UserAmpInfo::new(slot, name, 1.0).write_frame(), req::user_amp(slot)]);
+        Ok(())
+    }
+
     /// Import IR data into user IR `slot` (0–9) the way the official app does: show the CAB page,
     /// select the slot's cab model, write the 2048 floats, then the name. Only slot 0 has been
     /// captured; other slots are assumed to work the same way.
@@ -321,6 +333,18 @@ impl Device {
             self.send(b);
         }
         self.write(upload::user_ir_upload(slot, name, data));
+        Ok(())
+    }
+
+    /// Rename user IR `slot` (0–9) without touching its sound: write only the `0x09` name record
+    /// (the import's last step), then re-read it. Confirmed on the pedal like
+    /// [`Device::rename_user_amp`]. Names are cut to 31 characters; the official app's imports use
+    /// at most 16 ([`crate::ir::slot_name`]).
+    pub fn rename_user_ir(&self, slot: u8, name: &str) -> Result<(), UploadError> {
+        if slot >= upload::USER_SLOTS {
+            return Err(UploadError::Slot(slot));
+        }
+        self.write(vec![upload::user_ir_name(slot, name), req::ir_slot(slot)]);
         Ok(())
     }
 

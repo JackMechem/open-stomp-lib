@@ -26,7 +26,7 @@ the pedal, your program can do with the calls below. From Python, see [11](11-py
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.5.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.5.1" }
 # or, with a local checkout next to your project:
 open-stomp = { path = "../open-stomp-lib" }
 # protocol only (no MIDI I/O, no dependencies):
@@ -312,11 +312,17 @@ on the pedal with the app's conversion. `ir::convert_optimised` fits a 384-tap f
 dev.import_user_amp(2, "Jcm800", &data, 1.0)?;   // USER AMP 03: select model 32, slot info, 61 chunks
 dev.import_user_ir(0, "My Cab", &data)?;         // USER IR 01: CAB page, model 30, 61 chunks, name
 dev.delete_user_amp(2)?;
+dev.rename_user_amp(2, "Marshall JCM800")?;     // only the name; the sound stays as it is
+dev.rename_user_ir(0, "SVT 8x10 57")?;
 ```
 
 These send the official app's sequences, tested byte for byte against every captured import. They return an
 `UploadError` for a slot outside 0–9 or data that isn't 2048 finite floats. `upload::Reassembler` turns captured
 chunks back into floats.
+
+The official app can't rename a slot. `rename_user_amp` and `rename_user_ir` send only the name record of an import
+(the AMP slot-info write, the IR `0x09` name write) and re-read the slot; on the pedal the slot's sound is unchanged
+([05](05-uploads-nam-ir.md#renaming-a-slot)). Names are cut to 31 characters.
 
 ### Changing system settings
 

@@ -322,6 +322,14 @@ software on the pedal's own dry take (rms dB, levels matched): frequency respons
 (40–160 Hz) 4.95 / 5.35 / **3.51**, note dynamics 9.34 / 5.84 / **2.88**, harmonics 12.16 / 10.85 / **8.60**
 (`tools/pedalsim/readme_plots.py`; the README graphs).
 
+### Renaming a slot
+
+The official app has no rename, but the name lives in its own record: the AMP slot-info write (sub 3) that starts an
+import, and the IR `0x09` name write that ends one. Sending only that record renames the slot and leaves its sound
+alone. Tested on 2026-10-22 on USER AMP 10 and USER IR 10: a sweep through each block, recorded before and after the
+rename, differs by at most 0.09 dB (rig noise), and the new names read back after reconnecting. Then all twenty slots
+were renamed the same way. `Device::rename_user_amp` / `rename_user_ir` send the record and re-read the slot.
+
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
 ```
