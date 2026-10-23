@@ -1,0 +1,4 @@
+/* Wide tables and graphs on the analysis and reference pages. */
+.content main { max-width: 900px; }
+.content img { display: block; max-width: 100%; height: auto; margin: 1em 0; border-radius: 6px; }
+table { display: block; overflow-x: auto; }

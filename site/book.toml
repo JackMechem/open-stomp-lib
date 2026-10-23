@@ -1,0 +1,25 @@
+[book]
+title = "Open Stomp"
+description = "Open tools for the SORAN Dual Stomp Lite: the open-stomp library (Rust and Python), Open Stomp Manager, the reverse-engineered protocol and the NAM / IR conversion research."
+authors = ["Jack Mechem"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/JackMechem/open-stomp-lib"
+site-url = "/open-stomp-lib/"
+default-theme = "light"
+preferred-dark-theme = "navy"
+additional-css = ["theme/extra.css"]
+no-section-label = true
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+limit-results = 20

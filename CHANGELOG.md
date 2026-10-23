@@ -6,6 +6,10 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Added
+- Documentation site (mdBook, `site/`, published to GitHub Pages by `.github/workflows/pages.yml`): install guides,
+  both repositories' docs, the NAM / IR analysis with an interactive re-amp comparison, and the API reference.
+
 ### Changed
 - `nam::optimise`: the loss now weights frequencies so each octave counts about the same
   (`Options::weighting`, `Weighting::Octave`, the new default). The old flat weighting gave the bottom octave
@@ -13,7 +17,8 @@ All notable changes to `open-stomp`. The format follows
   of the Ampeg SVT-VR Classic (Normal) model drops from 4.9 to 2.1 dB rms and the frequency response error from
   2.5 to 1.2 dB; the frequency response improves on all six models tried, the low end on five (docs/05, "Low
   end"). `Weighting::Flat` keeps the old loss;
-  example `nam_optimise --flat`. Not yet confirmed on hardware.
+  example `nam_optimise --flat`. On hardware, a bass DI re-amped through the pedal against the
+  model and IR in software: low end 5.2 → 3.8 dB rms, overall tone 3.5 → 2.8 dB (2.1 dB with the IR change below).
 - `ir::convert_optimised`: the tap fit now covers 30 Hz – 16 kHz instead of 25 Hz – 20 kHz. Cab IRs have next to
   nothing above 16 kHz, and matching it cost taps the rest of the range needs: on fifteen Ampeg IRs the 1/3-octave
   error of what the pedal plays drops from 2.42 to 2.18 dB rms (better on 13; the two DI recordings get slightly

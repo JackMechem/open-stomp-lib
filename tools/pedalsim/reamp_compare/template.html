@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NAM Conversion Comparison</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f3f2ee;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --border: #e1e0d9;
+    --os: #2a78d6; --new: #2a78d6; --old: #1baf7a; --ori: #4a3aa7; --vendor: #eb6834; --ref: #0b0b0b; --di: #898781;
+    --div-neg: #2a78d6; --div-mid: #f0efec; --div-pos: #e34948;
+    --seq-lo: #f3f2ee; --seq-hi: #104281;
+    --shade: rgba(137,135,129,0.12); --playhead: #0b0b0b;
+    --good: #006300;
+    --nam: #1baf7a; --shared: #52514e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: #2c2c2a;
+      --os: #3987e5; --new: #3987e5; --old: #199e70; --ori: #9085e9; --vendor: #d95926; --ref: #ffffff; --di: #898781;
+      --div-neg: #3987e5; --div-mid: #383835; --div-pos: #e66767;
+      --seq-lo: #232321; --seq-hi: #cde2fb;
+      --shade: rgba(137,135,129,0.16); --playhead: #ffffff;
+      --good: #0ca30c;
+      --nam: #199e70; --shared: #c3c2b7;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: #2c2c2a;
+    --os: #3987e5; --new: #3987e5; --old: #199e70; --ori: #9085e9; --vendor: #d95926; --ref: #ffffff; --di: #898781;
+    --div-neg: #3987e5; --div-mid: #383835; --div-pos: #e66767;
+    --seq-lo: #232321; --seq-hi: #cde2fb;
+    --shade: rgba(137,135,129,0.16); --playhead: #ffffff;
+    --good: #0ca30c;
+    --nam: #199e70; --shared: #c3c2b7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.1rem; margin: 0 0 2px; }
+  .sub { color: var(--ink-2); margin: 0; max-width: 760px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 20px; }
+  .card > p.lead { color: var(--ink-2); margin: 0 0 14px; font-size: 0.93rem; max-width: 780px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 20px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .tile .k { color: var(--ink-2); font-size: 0.85rem; }
+  .tile .pair { display: flex; gap: 18px; margin-top: 6px; align-items: baseline; flex-wrap: wrap; }
+  .tile .v { font-size: 1.6rem; font-weight: 600; line-height: 1.1; }
+  .tile .who { font-size: 0.78rem; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+  .tile .note { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+  .key { display: inline-block; width: 14px; height: 2px; border-radius: 1px; vertical-align: middle; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.83rem; color: var(--ink-2); margin: 0 0 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface); color: var(--ink);
+         border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 0.8rem;
+         box-shadow: 0 4px 16px rgba(0,0,0,0.12); display: none; min-width: 150px; }
+  .tip .h { color: var(--ink-2); margin-bottom: 4px; }
+  .tip .r { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .tip .r b { font-variant-numeric: tabular-nums; }
+  .tip .r span { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+  /* player */
+  .player { display: grid; gap: 12px; }
+  .sources { display: flex; flex-wrap: wrap; gap: 8px; }
+  .src { font: inherit; font-size: 0.88rem; border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+         border-radius: 8px; padding: 7px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .src kbd { font: 0.75rem ui-monospace, monospace; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+  .src[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .play { font: inherit; font-weight: 600; background: var(--ink); color: var(--surface); border: 0; border-radius: 8px; padding: 8px 16px; cursor: pointer; min-width: 86px; }
+  .time { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 0.9rem; }
+  .hint { color: var(--muted); font-size: 0.8rem; }
+  canvas.ov { width: 100%; height: 72px; display: block; cursor: pointer; border-radius: 6px; background: var(--surface-2); }
+  .heatwrap { display: grid; gap: 6px; }
+  .heatrow { display: grid; grid-template-columns: 120px 1fr; gap: 8px; align-items: center; }
+  .heatrow .lab { font-size: 0.82rem; color: var(--ink-2); text-align: right; }
+  .heatrow canvas { width: 100%; height: 120px; display: block; cursor: crosshair; border-radius: 4px; }
+  .scale { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+  .scale .bar { width: 180px; height: 10px; border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--grid); text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink-2); font-weight: 500; }
+  td.best { font-weight: 650; }
+  .scroll { overflow-x: auto; }
+  details summary { cursor: pointer; color: var(--ink-2); font-size: 0.88rem; margin-top: 10px; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+  ul.notes { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 0.9rem; }
+  ul.notes li { margin: 4px 0; }
+  code { font: 0.86em ui-monospace, monospace; background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+  .themebtn { float: right; font: inherit; font-size: 0.8rem; background: none; border: 1px solid var(--border); color: var(--ink-2); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+  @media (max-width: 760px) {
+    .grid2 { grid-template-columns: 1fr; }
+    .heatrow { grid-template-columns: 1fr; }
+    .heatrow .lab { text-align: left; }
+    h1 { font-size: 1.45rem; }
+  }
+  .back { display: inline-block; margin-bottom: 12px; color: var(--ink-2); text-decoration: none; font-size: 14px; }
+  .back:hover { color: var(--ink); text-decoration: underline; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" id="back" hidden></a>
+  <button class="themebtn" id="themebtn" type="button">Theme</button>
+  <h1 id="title">NAM conversion comparison</h1>
+  <p class="sub" id="subtitle">The same bass DI re-amped through the pedal with the official app's NAM conversion and with open-stomp's (both with the
+    same open-stomp-converted IR), compared with the original NAM model and IR from TONE3000. All takes are time-aligned to the DI and
+    loudness-matched to the reference before comparing.</p>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card" id="listen">
+    <h2>Listen</h2>
+    <p class="lead">Aligned and loudness-matched, so switching is instant and fair. Number keys switch source, <b>space</b> plays/pauses,
+      <b>← →</b> skip 5 s. Click the waveform, a time chart or a heatmap to jump there.</p>
+    <div class="player">
+      <div class="sources" id="sources"></div>
+      <div class="controls">
+        <button class="play" id="play" type="button">Play</button>
+        <span class="time" id="time">0:00.0 / 0:00</span>
+        <span class="hint" id="trim"></span>
+      </div>
+      <canvas class="ov" id="ov" aria-label="Waveform overview of the selected source; click to seek"></canvas>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Tone: long-term spectrum</h2>
+    <p class="lead">Average spectrum over the whole performance, 1/6-octave smoothed, relative to the reference's loudest band. The steep
+      drop above ~5 kHz is the cab IR: bass cabs put out almost nothing up there. The shaded region is where the reference is more than
+      60 dB down.</p>
+    <div class="legend" id="lg-spec"></div>
+    <div class="chart" id="c-spec"></div>
+  </section>
+
+  <section class="card">
+    <h2>Difference from the reference by frequency</h2>
+    <p class="lead">Each conversion's long-term spectrum minus the reference's. 0 dB is a perfect match. The shaded region is where the
+      reference itself is more than 60 dB down (essentially silence), so differences there don't matter.</p>
+    <div class="legend" id="lg-diff"></div>
+    <div class="chart" id="c-diff"></div>
+  </section>
+
+  <section class="card">
+    <h2>Error over time</h2>
+    <p class="lead">For every moment, how far each conversion's third-octave band levels are from the reference's (rms over the bands that are
+      playing, dB; lower is closer). Averaged into 0.5 s steps. Below it, the DI input level and where each file clips.</p>
+    <div class="legend" id="lg-err"></div>
+    <div class="chart" id="c-err"></div>
+    <div class="chart" id="c-ctx"></div>
+  </section>
+
+  <section class="card">
+    <h2>Where and when they differ</h2>
+    <p class="lead">Top: the reference's band levels over time. Below: each conversion minus the reference, per third-octave band.
+      Red is louder than the reference, blue is quieter, gray is a match. Blank cells are silence.</p>
+    <div class="heatwrap" id="heat"></div>
+    <div class="scale" id="heatscale"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Dynamics</h2>
+      <p class="lead">Output level against DI input level (50 ms frames, median per 2 dB of input). Steeper means less compression.</p>
+      <div class="legend" id="lg-dyn"></div>
+      <div class="chart" id="c-dyn"></div>
+    </section>
+    <section class="card">
+      <h2>Levels and clipping</h2>
+      <p class="lead">The files as exported, before any matching.</p>
+      <div class="scroll"><table id="t-levels"></table></div>
+      <details><summary>Clip times</summary><div id="clips" class="hint" style="margin-top:8px"></div></details>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>By band</h2>
+    <p class="lead">Mean difference from the reference per third-octave band, over the moments that band is playing. <b>Bias</b> is the average
+      (positive = louder than the reference), <b>typical error</b> the average size of the difference. The closer conversion is in bold.</p>
+    <div class="scroll"><table id="t-bands"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>How this was measured</h2>
+    <ul class="notes" id="method"></ul>
+  </section>
+</main>
+<div class="tip" id="tip" role="tooltip"></div>
+<script id="data" type="application/json">/*DATA*/</script>
+<script>
+"use strict";
+const D = JSON.parse(document.getElementById("data").textContent);
+const CSS = { ref: "--ref", di: "--di", new: "--new", old: "--old", vendor: "--vendor", ori: "--ori", os: "--os" };
+const SER = {
+  ref:    { label: "TONE3000 (original NAM + IR)", css: "--ref" },
+  vendor: { label: "Vendor conversion", css: "--vendor" },
+  os:     { label: "open-stomp conversion", css: "--os" },
+  di:     { label: "Raw DI", css: "--di" },
+  nam:    { label: "open-stomp − vendor (NAM conversion only)", css: "--nam" },
+  shared: { label: "Shared by both (IR + pedal, at most)", css: "--shared" },
+};
+for (const [k, , label] of D.takes) SER[k] = { label, css: CSS[k] || "--ori" };
+SER.di = { label: D.di_label || "Raw DI", css: "--di" };
+for (const k in (D.shorts || {})) if (SER[k]) SER[k].short = D.shorts[k];
+const CMP = D.cmp, ALL = ["ref", ...CMP];
+const short = k => (SER[k].short || SER[k].label);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const col = k => css(SER[k].css);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const fmtHz = f => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 0 : 1).replace(/\.0$/, "") + " kHz" : Math.round(f) + " Hz";
+const fmtT = t => { const m = Math.floor(t / 60), s = t - m * 60; return m + ":" + (s < 10 ? "0" : "") + s.toFixed(1); };
+const fmtDb = v => v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(1) + " dB";
+const tip = document.getElementById("tip");
+
+function showTip(ev, head, rows) {
+  tip.replaceChildren();
+  const h = document.createElement("div"); h.className = "h"; h.textContent = head; tip.appendChild(h);
+  for (const [k, label, value] of rows) {
+    const r = document.createElement("div"); r.className = "r";
+    const s = document.createElement("span");
+    if (k) { const key = document.createElement("i"); key.className = "key"; key.style.background = k; s.appendChild(key); }
+    s.appendChild(document.createTextNode(label));
+    const b = document.createElement("b"); b.textContent = value;
+    r.append(b, s); tip.appendChild(r);
+  }
+  tip.style.display = "block";
+  const w = tip.offsetWidth, hgt = tip.offsetHeight;
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
+  if (y + hgt > innerHeight - 8) y = ev.clientY - hgt - 14;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+const hideTip = () => { tip.style.display = "none"; };
+
+function legend(id, keys, extra = []) {
+  const box = document.getElementById(id); box.replaceChildren();
+  for (const k of keys) {
+    const s = document.createElement("span"), i = document.createElement("i");
+    i.className = "key"; i.style.background = col(k);
+    if (k === "ref") i.style.height = "3px";
+    s.append(i, document.createTextNode(SER[k].label)); box.appendChild(s);
+  }
+  for (const t of extra) { const s = document.createElement("span"); s.textContent = t; box.appendChild(s); }
+}
+
+// ---------- generic line chart ----------
+const charts = [];
+function lineChart(o) {
+  const host = document.getElementById(o.id);
+  const draw = () => {
+    host.replaceChildren();
+    const W = host.clientWidth, H = o.height || 280;
+    const m = { l: 46, r: o.directLabels ? 118 : 14, t: 10, b: o.xTitle ? 38 : 24 };
+    if (W < 520 && o.directLabels) m.r = 14;
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, height: H, role: "img", "aria-label": o.aria }, host);
+    const [x0, x1] = o.xDomain, [y0, y1] = o.yDomain;
+    const lx = v => Math.log(v);
+    const X = o.xLog ? v => m.l + (lx(v) - lx(x0)) / (lx(x1) - lx(x0)) * iw : v => m.l + (v - x0) / (x1 - x0) * iw;
+    const Y = v => m.t + (1 - (Math.max(y0, Math.min(y1, v)) - y0) / (y1 - y0)) * ih;
+    // shading
+    for (const [a, b] of (o.shade || [])) el("rect", { x: X(a), y: m.t, width: Math.max(0, X(b) - X(a)), height: ih, fill: css("--shade") }, svg);
+    // grid + y ticks
+    for (const t of o.yTicks) {
+      el("line", { x1: m.l, x2: m.l + iw, y1: Y(t), y2: Y(t), stroke: t === 0 && o.zeroLine ? css("--axis") : css("--grid"), "stroke-width": t === 0 && o.zeroLine ? 1.5 : 1 }, svg);
+      const tx = el("text", { x: m.l - 8, y: Y(t) + 4, "text-anchor": "end" }, svg); tx.textContent = (o.yFmt || String)(t);
+    }
+    for (const t of o.xTicks) {
+      if (t < x0 || t > x1) continue;
+      el("line", { x1: X(t), x2: X(t), y1: m.t, y2: m.t + ih, stroke: css("--grid") }, svg);
+      const tx = el("text", { x: X(t), y: m.t + ih + 16, "text-anchor": "middle" }, svg); tx.textContent = (o.xFmt || String)(t);
+    }
+    if (o.xTitle) { const t = el("text", { x: m.l + iw / 2, y: H - 4, "text-anchor": "middle" }, svg); t.textContent = o.xTitle; }
+    if (o.yTitle) { const t = el("text", { x: 12, y: m.t + ih / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${m.t + ih / 2})` }, svg); t.textContent = o.yTitle; }
+    el("line", { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, stroke: css("--axis") }, svg);
+    // series
+    const ends = [];
+    for (const s of o.series) {
+      let d = "", pen = false;
+      o.x.forEach((xv, i) => {
+        const v = s.values[i];
+        if (v == null || xv < x0 || xv > x1) { pen = false; return; }
+        d += (pen ? "L" : "M") + X(xv).toFixed(1) + "," + Y(v).toFixed(1); pen = true;
+      });
+      el("path", { d, fill: "none", stroke: col(s.key), "stroke-width": s.key === "ref" ? 2.5 : 2, "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-dasharray": s.dash || "" }, svg);
+      if (o.directLabels && W >= 520) {
+        let j = o.x.length - 1; while (j > 0 && (s.values[j] == null || o.x[j] > x1)) j--;
+        ends.push({ y: Y(s.values[j]), text: s.short || SER[s.key].label, key: s.key });
+      }
+    }
+    // direct labels with collision nudging
+    ends.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 14) ends[i].y = ends[i - 1].y + 14;
+    for (const e of ends) { const t = el("text", { x: m.l + iw + 8, y: e.y + 4 }, svg); t.textContent = e.text; t.style.fill = css("--ink-2"); }
+    // playhead (time charts)
+    let ph = null;
+    if (o.playhead) { ph = el("line", { y1: m.t, y2: m.t + ih, stroke: css("--playhead"), "stroke-width": 1, opacity: 0 }, svg); }
+    // crosshair
+    const cross = el("line", { y1: m.t, y2: m.t + ih, stroke: css("--axis"), "stroke-width": 1, opacity: 0 }, svg);
+    const dots = o.series.map(s => el("circle", { r: 4, fill: col(s.key), stroke: css("--surface"), "stroke-width": 2, opacity: 0 }, svg));
+    const hit = el("rect", { x: m.l, y: 0, width: iw, height: H, fill: "transparent", tabindex: 0 }, svg);
+    if (o.onClick) hit.style.cursor = "pointer";
+    const nearest = px => {
+      let best = -1, bd = Infinity;
+      o.x.forEach((xv, i) => { if (xv < x0 || xv > x1) return; const dd = Math.abs(X(xv) - px); if (dd < bd) { bd = dd; best = i; } });
+      return best;
+    };
+    const svgX = ev => { const r = svg.getBoundingClientRect(); return (ev.clientX - r.left) * W / r.width; };
+    hit.addEventListener("pointermove", ev => {
+      const i = nearest(svgX(ev)); if (i < 0) return;
+      cross.setAttribute("x1", X(o.x[i])); cross.setAttribute("x2", X(o.x[i])); cross.setAttribute("opacity", 1);
+      o.series.forEach((s, k) => { const v = s.values[i]; dots[k].setAttribute("opacity", v == null ? 0 : 1); if (v != null) { dots[k].setAttribute("cx", X(o.x[i])); dots[k].setAttribute("cy", Y(v)); } });
+      showTip(ev, o.tipHead(o.x[i]), o.series.map(s => [col(s.key), s.short || SER[s.key].label, s.values[i] == null ? "–" : (o.tipFmt || fmtDb)(s.values[i])]));
+    });
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); dots.forEach(d => d.setAttribute("opacity", 0)); hideTip(); });
+    if (o.onClick) hit.addEventListener("click", ev => { const r = svg.getBoundingClientRect(); const px = (ev.clientX - r.left) * W / r.width; o.onClick(x0 + (px - m.l) / iw * (x1 - x0)); });
+    o._ph = ph ? t => { ph.setAttribute("x1", X(t)); ph.setAttribute("x2", X(t)); ph.setAttribute("opacity", 0.6); } : null;
+    if (o.after) o.after(svg, X, Y, m, iw, ih);
+  };
+  o.draw = draw; charts.push(o); draw();
+  return o;
+}
+
+// ---------- tiles ----------
+function tiles() {
+  const box = document.getElementById("tiles"); box.replaceChildren();
+  const mk = (title, val, note) => {
+    const t = document.createElement("div"); t.className = "tile";
+    const k = document.createElement("div"); k.className = "k"; k.textContent = title; t.appendChild(k);
+    const pair = document.createElement("div"); pair.className = "pair";
+    for (const key of CMP) {
+      const w = document.createElement("div");
+      const v = document.createElement("div"); v.className = "v"; v.textContent = val(key);
+      const who = document.createElement("div"); who.className = "who";
+      const i = document.createElement("i"); i.className = "key"; i.style.background = col(key);
+      who.append(i, document.createTextNode(short(key))); w.append(v, who); pair.appendChild(w);
+    }
+    t.appendChild(pair);
+    const n = document.createElement("div"); n.className = "note"; n.textContent = note; t.appendChild(n);
+    box.appendChild(t);
+  };
+  mk("Low end (40–160 Hz)", k => D.low_err[k].toFixed(1) + " dB", "rms of the long-term spectrum difference from the reference, 40–160 Hz; lower is closer");
+  mk("Overall tone (40 Hz–10 kHz)", k => D.ltas_err[k].toFixed(1) + " dB", "rms of the long-term spectrum difference from the reference; lower is closer");
+  mk("Moment-to-moment (median)", k => D.err_median[k].toFixed(1) + " dB", "third-octave bands, 100 ms windows; lower is closer");
+  mk("Closest to the reference", k => Math.round(100 * D.closest[k] / D.frames_compared) + "%", `share of ${D.frames_compared} playing 100 ms windows where each take is the closest`);
+}
+
+// ---------- player ----------
+const order = ["ref", ...CMP, "di"];
+const audio = {}; let active = "ref", playing = false;
+// no audio published: a stand-in that keeps the time charts' playhead logic working
+const silent = () => ({ currentTime: 0, volume: 1, preload: "", pause() {}, play() { return Promise.resolve(); }, addEventListener() {} });
+function player() {
+  if (!D.audio) document.getElementById("listen").hidden = true;
+  if (D.back) { const b = document.getElementById("back"); b.href = D.back.href; b.textContent = "← " + D.back.label; b.hidden = false; }
+  const box = document.getElementById("sources");
+  order.forEach((k, n) => {
+    const a = D.audio ? new Audio(D.audio.base + k + D.audio.ext) : silent(); a.preload = "auto"; a.volume = k === active ? 1 : 0; audio[k] = a;
+    const b = document.createElement("button"); b.className = "src"; b.type = "button"; b.dataset.k = k;
+    const i = document.createElement("i"); i.className = "key"; i.style.background = col(k); i.style.height = "3px";
+    const kb = document.createElement("kbd"); kb.textContent = String(n + 1);
+    b.append(kb, i, document.createTextNode(SER[k].label));
+    b.addEventListener("click", () => select(k)); box.appendChild(b);
+  });
+  audio.ref.addEventListener("ended", () => { playing = false; order.forEach(k => audio[k].pause()); updBtn(); });
+  document.getElementById("play").addEventListener("click", toggle);
+  document.getElementById("trim").textContent = D.audio ? D.audio.note : "";
+  addEventListener("keydown", ev => {
+    if (ev.target.closest && ev.target.closest("input,textarea")) return;
+    if (ev.key >= "1" && ev.key <= String(order.length)) select(order[+ev.key - 1]);
+    else if (ev.key === " ") { ev.preventDefault(); toggle(); }
+    else if (ev.key === "ArrowRight") seek(now() + 5);
+    else if (ev.key === "ArrowLeft") seek(now() - 5);
+  });
+  const ov = document.getElementById("ov");
+  ov.addEventListener("click", ev => { const r = ov.getBoundingClientRect(); seek((ev.clientX - r.left) / r.width * D.duration); });
+  select(active);
+  setInterval(() => { if (!playing) return; const t = audio[active].currentTime; for (const k of order) if (k !== active && Math.abs(audio[k].currentTime - t) > 0.03) audio[k].currentTime = t; }, 500);
+  requestAnimationFrame(tick);
+}
+const now = () => audio[active].currentTime || 0;
+function select(k) {
+  const t = now(); active = k;
+  for (const j of order) { audio[j].volume = j === k ? 1 : 0; if (Math.abs(audio[j].currentTime - t) > 0.02) audio[j].currentTime = t; }
+  document.querySelectorAll(".src").forEach(b => b.setAttribute("aria-pressed", b.dataset.k === k));
+  drawOverview();
+}
+function toggle() {
+  if (playing) { order.forEach(k => audio[k].pause()); playing = false; }
+  else { const t = now(); order.forEach(k => { audio[k].currentTime = t; audio[k].play().catch(() => {}); }); playing = true; }
+  updBtn();
+}
+function seek(t) { t = Math.max(0, Math.min(D.duration - 0.05, t)); order.forEach(k => { audio[k].currentTime = t; }); }
+const updBtn = () => { document.getElementById("play").textContent = playing ? "Pause" : "Play"; };
+function drawOverview() {
+  const c = document.getElementById("ov"), dpr = devicePixelRatio || 1;
+  const W = c.clientWidth, H = c.clientHeight; c.width = W * dpr; c.height = H * dpr;
+  const g = c.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
+  const v = D.overview[active], n = v.length, peak = Math.max(...v) || 1;
+  g.fillStyle = col(active);
+  for (let x = 0; x < W; x++) {
+    const a = Math.floor(x / W * n), b = Math.max(a + 1, Math.floor((x + 1) / W * n));
+    let m = 0; for (let i = a; i < b; i++) m = Math.max(m, v[i]);
+    const h = m / peak * (H / 2 - 4); g.fillRect(x, H / 2 - h, 1, Math.max(1, 2 * h));
+  }
+  const t = now(), px = t / D.duration * W;
+  g.fillStyle = css("--playhead"); g.fillRect(px, 0, 1.5, H);
+}
+function tick() {
+  const t = now();
+  document.getElementById("time").textContent = fmtT(t) + " / " + fmtT(D.duration).replace(/\.\d$/, "");
+  drawOverview();
+  for (const o of charts) if (o._ph) o._ph(t);
+  heatPlayhead(t);
+  requestAnimationFrame(tick);
+}
+
+// ---------- charts ----------
+const fTicks = [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const fTickFmt = f => f >= 1000 ? (f / 1000) + "k" : String(f);
+function charts_() {
+  const c = D.centres;
+  legend("lg-spec", ALL);
+  const quietSpec = []; { let s0 = null; c.forEach((f, i) => { const q = D.ltas.ref[i] < -60; if (q && s0 == null) s0 = i; if (!q && s0 != null) { quietSpec.push([c[Math.max(0, s0 - 1)], f]); s0 = null; } }); if (s0 != null) quietSpec.push([c[Math.max(0, s0 - 1)], 18000]); }
+  lineChart({ id: "c-spec", aria: "Long-term spectra of the three takes", x: c, xLog: true, xDomain: [25, 18000], yDomain: [-115, 5],
+    yTicks: [-110, -100, -90, -80, -70, -60, -50, -40, -30, -20, -10, 0], height: 340, shade: quietSpec, xTicks: fTicks, xFmt: fTickFmt, yFmt: v => v + " dB", xTitle: "Frequency (Hz)", directLabels: true,
+    series: ALL.map(k => ({ key: k, values: D.ltas[k], short: short(k) })),
+    tipHead: fmtHz, tipFmt: v => v.toFixed(1) + " dB" });
+
+  const quiet = []; let s = null;
+  c.forEach((f, i) => { const q = D.ltas.ref[i] < -60; if (q && s == null) s = i; if (!q && s != null) { quiet.push([c[Math.max(0, s - 1)], f]); s = null; } });
+  if (s != null) quiet.push([c[Math.max(0, s - 1)], 18000]);
+  legend("lg-diff", CMP);
+  lineChart({ id: "c-diff", aria: "Spectrum difference from the reference", x: c, xLog: true, xDomain: [25, 18000], yDomain: [-20, 15],
+    yTicks: [-20, -15, -10, -5, 0, 5, 10, 15], zeroLine: true, xTicks: fTicks, xFmt: fTickFmt, yFmt: v => (v > 0 ? "+" : "") + v + " dB", xTitle: "Frequency (Hz)",
+    directLabels: true, shade: quiet,
+    series: CMP.map(k => ({ key: k, values: D.ltas_diff[k], short: short(k) })),
+    tipHead: fmtHz });
+
+  legend("lg-err", CMP, []);
+  const t = D.t_pool, dur = D.duration;
+  const tTicks = []; for (let x = 0; x <= dur; x += 15) tTicks.push(x);
+  const fmtMin = v => fmtT(v).replace(/\.\d$/, "");
+  lineChart({ id: "c-err", aria: "Band error over time", x: t, xDomain: [0, dur], yDomain: [0, 14], yTicks: [0, 2, 4, 6, 8, 10, 12, 14],
+    xTicks: tTicks, xFmt: fmtMin, yFmt: v => v + " dB", directLabels: true, playhead: true, height: 260,
+    series: CMP.map(k => ({ key: k, values: D.err_series[k], short: short(k) })),
+    tipHead: v => fmtT(v), tipFmt: v => v.toFixed(1) + " dB", onClick: seek });
+
+  // context: DI level + clip ticks
+  lineChart({ id: "c-ctx", aria: "DI input level and clip positions", x: t, xDomain: [0, dur], yDomain: [-75, 0], yTicks: [-40, -20, 0],
+    xTicks: tTicks, xFmt: fmtMin, yFmt: v => v + " dB", directLabels: true, playhead: true, height: 190, xTitle: "Time (m:ss) — DI peak level per 0.5 s; ticks mark clipped samples",
+    series: [{ key: "di", values: D.di_series, short: "DI level" }],
+    tipHead: v => fmtT(v), tipFmt: v => v.toFixed(1) + " dB", onClick: seek,
+    after: (svg, X, Y, m, iw, ih) => {
+      const rows = [...CMP].reverse().concat(["ref", "di"]), names = Object.fromEntries(rows.map(k => [k, (k === "di" ? "DI" : short(k)) + " clips"]));
+      rows.forEach((k, r) => {
+        const ev = D.summary[k].clip_events, yy = m.t + ih - 10 - r * 10;
+        el("line", { x1: m.l, x2: m.l + iw, y1: yy + 3.5, y2: yy + 3.5, stroke: css("--grid") }, svg);
+        for (const s of ev) el("line", { x1: X(s), x2: X(s), y1: yy, y2: yy + 7, stroke: col(k), "stroke-width": 2, "stroke-linecap": "round" }, svg);
+        if (iw + m.l + 100 <= svg.viewBox.baseVal.width) { const t = el("text", { x: m.l + iw + 8, y: yy + 7, "font-size": 9 }, svg); t.textContent = names[k] + (ev.length ? "" : " (none)"); }
+      });
+    } });
+
+  legend("lg-dyn", ALL);
+  const dx = D.dyn.x;
+  lineChart({ id: "c-dyn", aria: "Output level against input level", x: dx, xDomain: [dx[0], dx[dx.length - 1]], yDomain: [-58, -10],
+    yTicks: [-55, -45, -35, -25, -15], xTicks: dx.filter((v, i) => i % 3 === 0), xFmt: v => v.toFixed(0), yFmt: v => v + " dB", xTitle: "DI input level (dBFS, 50 ms rms)",
+    series: ALL.map(k => ({ key: k, values: D.dyn[k], short: short(k) })),
+    tipHead: v => "input " + v.toFixed(0) + " dBFS", tipFmt: v => v.toFixed(1) + " dB", height: 260 });
+}
+
+// ---------- heatmaps ----------
+const heatCanvases = [];
+function lerp(a, b, t) { return a + (b - a) * t; }
+function hex(h) { h = h.replace("#", ""); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); }
+function mix(c1, c2, t) { const a = hex(c1), b = hex(c2); return `rgb(${a.map((v, i) => Math.round(lerp(v, b[i], t))).join(",")})`; }
+function diverge(v, lim) { const t = Math.max(-1, Math.min(1, v / lim)); return t < 0 ? mix(css("--div-mid"), css("--div-neg"), -t) : mix(css("--div-mid"), css("--div-pos"), t); }
+function seq(v) { const t = Math.max(0, Math.min(1, (v + 60) / 60)); return mix(css("--seq-lo"), css("--seq-hi"), Math.pow(t, 1.3)); }
+function heatmaps() {
+  const box = document.getElementById("heat"); box.replaceChildren(); heatCanvases.length = 0;
+  const rows = [["ref", "Reference level", v => seq(v), v => v.toFixed(0) + " dB re max"], ...CMP.map(k => [k, short(k) + " − ref", v => diverge(v, 12), fmtDb])];
+  const F = D.third, dt = D.heat_dt;
+  for (const [k, label, color, fmt] of rows) {
+    const r = document.createElement("div"); r.className = "heatrow";
+    const l = document.createElement("div"); l.className = "lab";
+    const i = document.createElement("i"); i.className = "key"; i.style.background = col(k); i.style.marginRight = "6px";
+    l.append(i, document.createTextNode(label));
+    const c = document.createElement("canvas"); r.append(l, c); box.appendChild(r);
+    const M = D.heat[k], nb = M.length, nt = M[0].length;
+    const draw = () => {
+      const dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+      c.width = W * dpr; c.height = H * dpr; const g = c.getContext("2d"); g.scale(dpr, dpr);
+      g.fillStyle = css("--surface-2"); g.fillRect(0, 0, W, H);
+      const cw = W / nt, ch = H / nb;
+      for (let b = 0; b < nb; b++) for (let j = 0; j < nt; j++) {
+        const v = M[b][j]; if (v == null || (k === "ref" && v <= -60)) continue;
+        g.fillStyle = color(v); g.fillRect(j * cw, H - (b + 1) * ch, cw + 0.6, ch + 0.4);
+      }
+      g.fillStyle = css("--muted"); g.font = "10px system-ui";
+      for (const f of [100, 1000, 10000]) { const b = F.findIndex(x => x >= f * 0.99); if (b >= 0) g.fillText(fTickFmt(f >= 1000 ? f : f), 3, H - b * ch - 2); }
+    };
+    c.addEventListener("pointermove", ev => {
+      const rc = c.getBoundingClientRect();
+      const j = Math.floor((ev.clientX - rc.left) / rc.width * nt), b = nb - 1 - Math.floor((ev.clientY - rc.top) / rc.height * nb);
+      if (j < 0 || j >= nt || b < 0 || b >= nb) return;
+      const rowsT = [["ref", "Reference level"], ...CMP.map(k => [k, short(k) + " − ref"])].map(([kk, lab]) => {
+        const v = D.heat[kk][b][j]; return [col(kk), lab, v == null || (kk === "ref" && v <= -60) ? "silent" : (kk === "ref" ? v.toFixed(0) + " dB" : fmtDb(v))];
+      });
+      showTip(ev, `${fmtT(j * dt)} · ${fmtHz(F[b])}`, rowsT);
+    });
+    c.addEventListener("pointerleave", hideTip);
+    c.addEventListener("click", ev => { const rc = c.getBoundingClientRect(); seek((ev.clientX - rc.left) / rc.width * D.duration); });
+    heatCanvases.push({ c, draw }); draw();
+  }
+  // playhead overlay canvases: drawn as a thin positioned div per row
+  for (const h of heatCanvases) {
+    const ph = document.createElement("div");
+    ph.style.cssText = "position:absolute;top:0;bottom:0;width:1.5px;background:var(--playhead);opacity:.6;pointer-events:none;left:0";
+    const wrap = document.createElement("div"); wrap.style.position = "relative";
+    h.c.replaceWith(wrap); wrap.append(h.c, ph); h.ph = ph;
+  }
+  const sc = document.getElementById("heatscale"); sc.replaceChildren();
+  const bar = (stops, a, b, mid) => {
+    const s = document.createElement("span"); s.style.display = "inline-flex"; s.style.alignItems = "center"; s.style.gap = "6px";
+    const l = document.createElement("span"); l.textContent = a;
+    const g = document.createElement("span"); g.className = "bar"; g.style.background = `linear-gradient(90deg, ${stops.join(",")})`;
+    const r = document.createElement("span"); r.textContent = b;
+    s.append(l, g, r); if (mid) { const m = document.createElement("span"); m.textContent = mid; s.append(m); } sc.appendChild(s);
+  };
+  bar([css("--div-neg"), css("--div-mid"), css("--div-pos")], "−12 dB quieter", "+12 dB louder", "(differences)");
+  bar([seq(-60), seq(-30), seq(0)], "−60 dB", "loudest", "(reference level)");
+}
+function heatPlayhead(t) { for (const h of heatCanvases) if (h.ph) h.ph.style.left = (t / D.duration * 100) + "%"; }
+
+// ---------- tables ----------
+function tables() {
+  const S = D.summary, t = document.getElementById("t-levels"); t.replaceChildren();
+  const head = ["", "RMS", "Peak", "Crest", "Clipped samples", "Offset vs DI", "Matching gain"];
+  const tr = document.createElement("tr"); head.forEach(h => { const th = document.createElement("th"); th.textContent = h; tr.appendChild(th); }); t.appendChild(tr);
+  for (const k of ["di", "ref", ...CMP]) {
+    const s = S[k], r = document.createElement("tr");
+    const c0 = document.createElement("td"); const i = document.createElement("i"); i.className = "key"; i.style.background = col(k); i.style.marginRight = "6px";
+    c0.append(i, document.createTextNode(SER[k].label)); r.appendChild(c0);
+    for (const v of [s.rms_dbfs.toFixed(1) + " dBFS", s.peak_dbfs.toFixed(1) + " dBFS", s.crest_db.toFixed(1) + " dB",
+                     s.clip_samples + (s.clip_events.length ? ` (${s.clip_events.length}×)` : ""),
+                     s.offset_ms == null ? "–" : s.offset_ms.toFixed(1) + " ms", s.gain_db == null ? "–" : fmtDb(s.gain_db)]) {
+      const td = document.createElement("td"); td.textContent = v; r.appendChild(td);
+    }
+    t.appendChild(r);
+  }
+  const cl = document.getElementById("clips"); cl.replaceChildren();
+  for (const k of ["di", "ref", ...CMP]) {
+    const ev = S[k].clip_events, p = document.createElement("div");
+    const secs = [...new Set(ev.map(x => Math.floor(x)))];
+    p.textContent = SER[k].label + ": " + (secs.length ? secs.map(x => fmtT(x).replace(/\.\d$/, "")).join(", ") : "none");
+    cl.appendChild(p);
+  }
+  const b = document.getElementById("t-bands"); b.replaceChildren();
+  const h2 = document.createElement("tr");
+  ["Band", ...CMP.map(k => short(k) + " bias"), ...CMP.map(k => short(k) + " typical error")].forEach(h => { const th = document.createElement("th"); th.textContent = h; h2.appendChild(th); });
+  b.appendChild(h2);
+  D.third.forEach((f, i) => {
+    const abs = CMP.map(k => D.band_abs[k][i]);
+    if (abs.every(v => v == null)) return;
+    const best = Math.min(...abs.filter(v => v != null));
+    const r = document.createElement("tr");
+    const cells = [fmtHz(f), ...CMP.map(k => fmtDb(D.band_bias[k][i])), ...abs.map(v => v == null ? "–" : v.toFixed(1) + " dB")];
+    cells.forEach((v, j) => { const td = document.createElement("td"); td.textContent = v;
+      if (j > CMP.length && abs[j - CMP.length - 1] === best) td.className = "best";
+      r.appendChild(td); });
+    b.appendChild(r);
+  });
+}
+
+function method() {
+  const ul = document.getElementById("method"); ul.replaceChildren();
+  for (const t of D.method) { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); }
+}
+
+// ---------- theme toggle ----------
+document.getElementById("themebtn").addEventListener("click", () => {
+  const r = document.documentElement, dark = getComputedStyle(r).colorScheme === "dark";
+  r.setAttribute("data-theme", dark ? "light" : "dark"); try { localStorage.setItem("nam-cmp-theme", r.dataset.theme); } catch (e) {}
+  redraw();
+});
+try { const th = localStorage.getItem("nam-cmp-theme"); if (th) document.documentElement.setAttribute("data-theme", th); } catch (e) {}
+
+function redraw() { tiles(); legendsRedraw(); charts.forEach(o => o.draw()); heatCanvases.forEach(h => h.draw()); tables(); document.querySelectorAll(".src i.key").forEach((i, n) => i.style.background = col(order[n])); drawOverview(); }
+function legendsRedraw() { legend("lg-spec", ALL); legend("lg-diff", CMP); legend("lg-err", CMP); legend("lg-dyn", ALL); }
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw);
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { charts.forEach(o => o.draw()); heatCanvases.forEach(h => h.draw()); }, 120); });
+
+if (D.title) document.getElementById("title").textContent = D.title;
+if (D.subtitle) document.getElementById("subtitle").textContent = D.subtitle;
+tiles(); charts_(); heatmaps(); tables(); method(); player();
+</script>
+</body>
+</html>

@@ -300,7 +300,22 @@ removed; the harmonics score is unreliable on clean models, whose 3rd/5th harmon
 Amp-only models (the cab comes from an IR) have a gentle low end that 512 taps can follow, and gain the most.
 Models with the cab captured in them keep a resonance the filters are too short for. Starting G1 with a steep low cut
 (so G1 makes the cut and G2 the resonance) gained another ~1 dB at 63–79 Hz on the G10 in the PyTorch prototype; not
-adopted. Not yet confirmed on hardware.
+adopted.
+
+**On hardware** (2026-10-22): the same 3-minute bass DI re-amped through the pedal in one session, against the model and
+the full IR run in software on the pedal's own dry input, loudness-matched (rms dB; the cab is the Beta52 IR):
+
+| Upload | Overall tone, 40 Hz – 10 kHz | Low end, 40–160 Hz | Moment to moment (median) |
+|---|---|---|---|
+| Official app NAM, 0.4 IR | 9.44 | 3.04 | 6.18 |
+| 0.4 NAM and IR | 3.53 | 5.18 | 4.35 |
+| 0.5 NAM, 0.4 IR | 2.79 | 3.78 | 3.64 |
+| 0.5 NAM and IR (the IR fit below) | **2.14** | 3.30 | **2.97** |
+
+Run in software on the same input, the 0.5 NAM upload alone is within ±0.5 dB of the model from 50 to 126 Hz; the
+remaining dip at 56–80 Hz is the IR's 384 taps (even the exact model through the pedal's IR is 7 dB short at 63 Hz).
+Fitting G2 and the IR together (895 taps) would reach further, but would tie the AMP slot to one cab.
+`tools/pedalsim/reamp_compare` has the analysis; the docs site shows it interactively.
 
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 

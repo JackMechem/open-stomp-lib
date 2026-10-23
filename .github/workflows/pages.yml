@@ -1,0 +1,64 @@
+name: Docs site
+
+# Builds the documentation site (site/, mdBook) from this repository's docs and Open Stomp Manager's, adds the
+# rustdoc API reference under /api, and publishes it to GitHub Pages. Needs Settings → Pages → Source:
+# "GitHub Actions". Run it by hand (Actions → Docs site → Run workflow) after changing the manager's docs.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  MDBOOK_VERSION: v0.5.4
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: JackMechem/open-stomp-manager
+          path: open-stomp-manager
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install ALSA headers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - uses: Swatinem/rust-cache@v2
+      - name: Install mdBook
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Assemble the docs of both repositories
+        run: python3 site/assemble.py open-stomp-manager
+      - name: Build the site
+        run: mdbook build site
+      - name: API reference
+        run: |
+          cargo doc --no-deps -p open-stomp
+          cp -r target/doc site/book/api
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/book
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

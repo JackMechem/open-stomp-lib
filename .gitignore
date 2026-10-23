@@ -9,3 +9,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 dist/
+# the site build: generated sources and output (site/assemble.py, mdbook build site)
+site/book/
+site/src/lib/
+site/src/manager/
