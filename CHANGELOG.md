@@ -6,7 +6,7 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
-## [0.6.0] - Unreleased
+## [0.6.0] - 2026-10-23
 
 ### Added
 - Bluetooth (the pedal's Wireless setting), feature `ble`: the engine also scans for the pedal over BLE-MIDI
