@@ -51,7 +51,7 @@ the error of what the pedal plays dropped from 2.42 to 2.18 dB rms, and at 40–
 The same DI, re-amped in one session through four versions. The reference is the original model and the full
 IR run in software on the pedal's own dry input:
 
-![Difference from the original model and IR by frequency for each version](images/lowend-difference.png)
+![Difference from the original model and IR by frequency for each version](../lib/images/nam-reamp-difference.png)
 
 | | Official app NAM, 0.4 IR | 0.4 NAM + IR | 0.5 NAM, 0.4 IR | **0.5 NAM + IR** |
 |---|---|---|---|---|

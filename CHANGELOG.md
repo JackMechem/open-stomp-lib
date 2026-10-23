@@ -6,6 +6,11 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Changed
+- README and docs site: the NAM and IR graphs re-measured on hardware in one session with the official app's, 0.4's
+  and 0.5's conversions (`tools/pedalsim/readme_plots.py <session>`, now with a dry-take reference instead of the
+  Mac rig's calibration); the real-playing comparison is on the README and the site's front page.
+
 ## [0.5.0] - 2026-10-22
 
 ### Added

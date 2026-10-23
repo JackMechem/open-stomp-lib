@@ -24,7 +24,9 @@ cross-platform editor, is built on it.
 * **Import NAM amp models** (feature `nam`): load and run `.nam` files (a Rust port of NeuralAmpModelerCore) and
   convert them for the pedal with an optimiser that fits the pedal's filters to the model through a simulation of
   the pedal (`Device::import_nam_file`; closer to the model than the official app), or with the official app's
-  algorithm, reverse engineered.
+  algorithm, reverse engineered. Imports are normalised to the built-in amps' level, like NAM plugins do.
+* **Import cab IRs**: read any WAV and fit it to the 384 samples the pedal actually plays
+  (`Device::import_ir_file`), or convert it exactly like the official app.
 * **Run the connection** (feature `device`): find the pedal, connect, follow hotplug, perform the official app's
   startup sync, send edits, report everything. It can also replay a capture log so you can develop without a pedal.
 
@@ -121,29 +123,43 @@ measurements of the model. open-stomp instead simulates the pedal (a model fitte
 optimises the filters until the simulated pedal sounds like the model. This is the default for
 `Device::import_nam_file`; it takes about a minute per model.
 
-Re-amped through the pedal and compared with the real model in software (Ampeg SVT bass model; rms error over
-1/3-octave sweep responses, note levels and harmonics, levels as uploaded before normalisation; lower is better):
+**Real playing.** A bass DI re-amped through the pedal with the Ampeg SVT-VR Classic (Normal) model and a cab IR,
+compared with the model and the full IR in software on exactly what the pedal heard (loudness-matched, rms dB; lower
+is better):
 
-| Upload | Frequency response | Note level | Harmonics | Overall |
+![Re-amped bass DI: how far each conversion is from the original model and IR, by frequency](docs/images/nam-reamp-difference.png)
+
+| | Official app | open-stomp 0.4 | open-stomp 0.5 |
+|---|---|---|---|
+| Overall tone (40 Hz–10 kHz) | 9.4 dB | 3.5 dB | **2.1 dB** |
+| Low end (40–160 Hz) | 3.0 dB | 5.2 dB | **3.3 dB** |
+| Moment to moment (median) | 6.2 dB | 4.3 dB | **3.0 dB** |
+| Closest to the original | 8% | 2% | **87%** of the recording |
+
+**[Open the interactive comparison](https://jackmechem.github.io/open-stomp-lib/analysis/session2.html)** for the
+spectra, the error over time and a time × frequency heatmap, or read
+[how the low end was fixed](https://jackmechem.github.io/open-stomp-lib/analysis/low-end.html).
+
+**Sweeps and tones.** The Ampeg SVT "Gain 10 Ultra Lo and Hi" model converted three ways and re-amped in one
+session (sweeps at four levels, bass tones; rms dB against the model in software, levels matched; lower is better):
+
+| Upload | Frequency response | Low end (40–160 Hz) | Note dynamics | Harmonics |
 |---|---|---|---|---|
-| Official app | 7.96 dB | 9.64 dB | 13.11 dB | **9.32 dB** |
-| open-stomp, optimised (two runs) | 5.56 dB | 4.23 dB | 10.57–11.00 dB | **6.72–6.85 dB** |
+| Official app | 4.75 dB | 4.95 dB | 9.34 dB | 12.16 dB |
+| open-stomp 0.4 | 3.05 dB | 5.35 dB | 5.84 dB | 10.85 dB |
+| open-stomp 0.5 | **2.14 dB** | **3.51 dB** | **2.88 dB** | **8.60 dB** |
 
-![NAM frequency response on the pedal: the real model, the official app's conversion and open-stomp's](docs/images/nam-frequency-response.png)
+![NAM frequency response on the pedal: the real model and the three conversions](docs/images/nam-frequency-response.png)
 
-![NAM: difference from the real model for both conversions](docs/images/nam-frequency-error.png)
+![NAM: difference from the real model for the three conversions](docs/images/nam-frequency-error.png)
 
 The graphs compare tone, so each upload is level-matched to the model over 100 Hz–8 kHz. Level is set separately: by
-default an import is normalised to the built-in amps' level. With levels matched, the official conversion is off by
-up to 15–24 dB in the deep bass, the 400 Hz–1 kHz mids at low input levels and the top octave (6.4–9.2 dB rms).
-open-stomp stays within about 5 dB from 50 Hz to 10 kHz (3.7–4.0 dB rms). It is still short on the 60–100 Hz
-resonance, which 512 taps can't fully reach. Details: [docs/05](docs/05-uploads-nam-ir.md#optimised-conversion).
-
-In 0.5 the NAM fit weights every octave equally and the IR fit skips the empty top octave, which closes
-most of that low-end gap: re-amping a bass DI through the pedal, the error against the model and IR drops from 5.2 to
-3.3 dB at 40–160 Hz and from 3.5 to 2.1 dB over the whole range. See
-[Fixing the low end](https://jackmechem.github.io/open-stomp-lib/analysis/low-end.html) on the docs site, with an
-interactive comparison.
+default an import is normalised to the built-in amps' level. The official conversion is off by up to 10–13 dB in the
+400 Hz–1 kHz mids at low input levels, 5–8 dB in the upper mids and up to 20 dB in the top octave (6.3–9.0 dB rms per
+sweep). Both open-stomp versions stay within 4 dB from 100 Hz to 10 kHz; 0.5 is closer overall (3.6–4.0 dB rms per
+sweep, which includes the sub-bass below 50 Hz; 0.4: 4.1–4.7). Below 100 Hz this model has a +20 dB resonance above a
+steep cut that 512 taps can't fully follow: at 63–80 Hz 0.5 is 4–8 dB short of it, 0.4 7.5–10 dB. Details:
+[docs/05](docs/05-uploads-nam-ir.md#optimised-conversion).
 
 ## IR conversion: closer to the real cab than the official app
 
@@ -152,22 +168,27 @@ is, cut off at that point, so it loses whatever comes later. That includes the w
 silence. open-stomp designs a 384-tap minimum-phase filter fitted to the full IR's response instead. This is the
 default for `Device::import_ir_file`; it takes about half a second.
 
-Re-amped through the pedal and compared with the full IR file in software (two Ampeg SVT cab IRs, levels matched):
+Re-amped through the pedal in one session and compared with the full IR file in software (two Ampeg SVT cab IRs,
+levels matched, 31.5 Hz–16 kHz):
 
-![IR frequency response on the pedal: the full IR file, the official app's upload and open-stomp's](docs/images/ir-frequency-response.png)
+![IR frequency response on the pedal: the full IR file and the three uploads](docs/images/ir-frequency-response.png)
 
-![IR: difference from the full IR file for both uploads](docs/images/ir-frequency-error.png)
+![IR: difference from the full IR file for the three uploads](docs/images/ir-frequency-error.png)
 
-| IR | Official app | open-stomp, optimised |
-|---|---|---|
-| Ampeg 8x10 57 AH | 3.95 dB rms | **2.36 dB rms** |
-| Ampeg SVT Neumann | 14.97 dB rms, and about 40 dB quieter | **5.87 dB rms** |
+| IR | Official app | open-stomp 0.4 | open-stomp 0.5 |
+|---|---|---|---|
+| Ampeg 8x10 57 AH | 5.28 dB rms | **1.36 dB rms** | 2.11 dB rms |
+| Ampeg SVT Neumann | 16.13 dB rms, and 45 dB quieter | **5.13 dB rms** | 5.23 dB rms |
 
-The SVT Neumann file starts with 21 ms of silence, so the official upload plays almost none of the cab. Both
-uploads have too much energy below 50 Hz, where the cab rolls off more steeply than 8 ms can follow. open-stomp is
-also a few dB short around 60–100 Hz on that IR. Details: [docs/05](docs/05-uploads-nam-ir.md).
+The SVT Neumann file starts with 21 ms of silence, so the official upload plays almost none of the cab. Every upload
+has too much energy below 50 Hz, where the cab rolls off more steeply than 8 ms can follow. 0.5's fit starts at
+30 Hz instead of 25 Hz: on the pedal that helps at 50–100 Hz on the Neumann (up to 1.8 dB closer) but costs 1–4 dB
+in the 32–40 Hz bands, below a bass's low E, which is where these two scores lose. Details:
+[docs/05](docs/05-uploads-nam-ir.md).
 
-The analysis code is in [`tools/pedalsim`](tools/pedalsim); `readme_plots.py --cached` redraws these graphs.
+The analysis code is in [`tools/pedalsim`](tools/pedalsim): `readme_plots.py <session>` measures a re-amp session and
+redraws these graphs (`--cached` redraws from `tools/pedalsim/results`), and
+[`reamp_compare`](tools/pedalsim/reamp_compare) builds the real-playing comparison.
 
 ## Status
 
@@ -182,7 +203,7 @@ The analysis code is in [`tools/pedalsim`](tools/pedalsim); `readme_plots.py --c
 | System settings | ✅ (some bytes unknown) | ✅ decode + encode |
 | User AMP (NAM) / user IR upload transport | ✅ chunk protocol decoded | ✅ `upload`, byte-exact vs capture |
 | NAM inference and NAM → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `nam`, verified against the app; optimised conversion verified on hardware |
-| IR (audio) → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `ir`, `Device::import_ir_file`, byte-exact vs the app |
+| IR (audio) → device conversion | ✅ algorithm recovered ([docs/05](docs/05-uploads-nam-ir.md)) | ✅ `ir`, `Device::import_ir_file`, byte-exact vs the app; optimised conversion verified on hardware |
 
 Live CCs are verified on hardware. Preset and settings **writes** match the official app byte for byte but have not
 yet been run on hardware from this code. Back up your presets first.

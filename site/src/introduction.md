@@ -10,6 +10,16 @@ Open tools for the **SORAN Dual Stomp Lite** guitar multi-effects pedal (USB `39
   the pedal: [how it works](analysis/overview.md) and [the results](analysis/results.md).
 * **[The protocol](lib/01-overview.md)**, documented in full, and [how it was recovered](lib/07-capture-methodology.md).
 
+<div class="feature">
+<p class="feature-tag">New in 0.5</p>
+<h2 class="feature-title">NAM imports that sound like the model, low end included</h2>
+<p>A bass DI re-amped through the pedal with four conversions of the same amp model, against the original model and
+cab IR in software. open-stomp 0.5 is the closest of the four in 87% of the recording.</p>
+<a href="analysis/session2.html"><img src="lib/images/nam-reamp-difference.png" alt="How far each NAM conversion is from the original model and IR, by frequency: open-stomp 0.5 stays within about 2 dB above 100 Hz, the official app's conversion is up to 17 dB too dark"></a>
+<p><a class="feature-button" href="analysis/session2.html">Open the interactive comparison →</a>
+<a class="feature-more" href="analysis/low-end.html">How the low end was fixed</a></p>
+</div>
+
 > Probably also works with the Dual Stomp and Tiny Stomp (same firmware family, same vendor app). Only the Dual Stomp
 > Lite on firmware **V1.1.1** with Stomp Manager **1.0.2** has been tested.
 

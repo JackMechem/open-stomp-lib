@@ -2,3 +2,14 @@
 .content main { max-width: 900px; }
 .content img { display: block; max-width: 100%; height: auto; margin: 1em 0; border-radius: 6px; }
 table { display: block; overflow-x: auto; }
+
+/* The feature card on the introduction page. */
+.feature { margin: 1.5em 0 2em; padding: 1.25em 1.5em; border: 1px solid var(--table-border-color);
+  border-radius: 10px; background: var(--quote-bg); }
+.feature-tag { margin: 0; font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--links); }
+.feature-title { margin: 0.2em 0 0.4em; font-size: 1.4em; }
+.feature img { margin: 1em 0; }
+.feature-button { display: inline-block; padding: 0.55em 1.1em; border-radius: 6px; background: var(--links);
+  color: var(--bg) !important; font-weight: 600; text-decoration: none !important; margin-right: 1em; }
+.feature-button:hover { filter: brightness(1.1); }

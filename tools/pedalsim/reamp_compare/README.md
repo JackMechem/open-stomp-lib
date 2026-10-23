@@ -11,7 +11,7 @@ python analyze.py <recordings dir> data.json '[["ref","ref.wav","Reference"],["n
 # 2. the page (add --audio BASE EXT NOTE to include the A/B player)
 python build.py data.json page.html --back comparison.html "Back to the docs"
 # 3. the static graph for the docs
-python plots.py data.json lowend-difference.png
+python plots.py data.json ../../../docs/images/nam-reamp-difference.png
 ```
 
 The first take is the reference; the keys `new`, `ori`, `old` and `vendor` pick the colours. `session2.json` is the

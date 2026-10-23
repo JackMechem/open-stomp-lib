@@ -6,22 +6,28 @@ or IR run in software. Lower is better everywhere.
 
 ## NAM: sweep measurements
 
-Ampeg SVT bass model, sweeps and tones at four input levels. The scores are rms error over 1/3-octave sweep
-responses, note levels and harmonics, with levels as uploaded before normalisation. Both conversions here are from
-open-stomp 0.4, before the [low-end fix](low-end.md).
+The Ampeg SVT "Gain 10 Ultra Lo and Hi MD 421" model, converted three ways and re-amped in one session: sweeps at
+four input levels and bass tones. Each upload is compared with the model run in software on the pedal's own dry take
+of the same signal. Scores are rms dB, with levels matched:
 
-| Upload | Frequency response | Note level | Harmonics | Overall |
+| Upload | Frequency response | Low end (40–160 Hz) | Note dynamics | Harmonics |
 |---|---|---|---|---|
-| Official app | 7.96 dB | 9.64 dB | 13.11 dB | **9.32 dB** |
-| open-stomp 0.4, optimised (two runs) | 5.56 dB | 4.23 dB | 10.57–11.00 dB | **6.72–6.85 dB** |
+| Official app | 4.75 dB | 4.95 dB | 9.34 dB | 12.16 dB |
+| open-stomp 0.4 | 3.05 dB | 5.35 dB | 5.84 dB | 10.85 dB |
+| open-stomp 0.5 | **2.14 dB** | **3.51 dB** | **2.88 dB** | **8.60 dB** |
 
-![NAM frequency response on the pedal: the real model, the official app's conversion and open-stomp's](../lib/images/nam-frequency-response.png)
+*Note dynamics* is how the level of each note changes with how hard it's played (fundamental levels of bass tones at
+three levels, after removing one overall offset). *Harmonics* compares the 3rd and 5th harmonics relative to each
+note's fundamental.
 
-![NAM: difference from the real model for both conversions](../lib/images/nam-frequency-error.png)
+![NAM frequency response on the pedal: the real model and the three conversions](../lib/images/nam-frequency-response.png)
 
-The graphs compare tone, so each upload is level-matched to the model over 100 Hz–8 kHz. With levels matched, the
-official conversion is off by up to 15–24 dB in the deep bass, in the 400 Hz–1 kHz mids at low input levels, and
-in the top octave. open-stomp stays within about 5 dB from 50 Hz to 10 kHz.
+![NAM: difference from the real model for the three conversions](../lib/images/nam-frequency-error.png)
+
+The graphs compare tone, so each upload is level-matched to the model over 100 Hz–8 kHz. The official conversion is
+off by up to 10–13 dB in the 400 Hz–1 kHz mids at low input levels, 5–8 dB in the upper mids and up to 20 dB in the
+top octave. Both open-stomp versions stay within 4 dB from 100 Hz to 10 kHz. Below that, this model has a +20 dB
+resonance at 63–80 Hz that 512 taps can't fully follow: 0.5 gets within 4–8 dB of it, 0.4 within 7.5–10.
 
 ## NAM: real playing
 
@@ -38,26 +44,29 @@ and the [interactive comparison](comparison.md) has every graph.
 
 ## IR: cab measurements
 
-The CAB block on its own, measured by sweep, against the full IR file in software, levels matched:
+The CAB block on its own, re-amped in the same session and measured by sweep, against the full IR file in software
+(31.5 Hz–16 kHz, levels matched):
 
-![IR frequency response on the pedal: the full IR file, the official app's upload and open-stomp's](../lib/images/ir-frequency-response.png)
+![IR frequency response on the pedal: the full IR file and the three uploads](../lib/images/ir-frequency-response.png)
 
-![IR: difference from the full IR file for both uploads](../lib/images/ir-frequency-error.png)
+![IR: difference from the full IR file for the three uploads](../lib/images/ir-frequency-error.png)
 
-| IR | Official app | open-stomp, optimised |
-|---|---|---|
-| Ampeg 8x10 57 AH | 3.95 dB rms | **2.36 dB rms** |
-| Ampeg SVT Neumann | 14.97 dB rms, and about 40 dB quieter | **5.87 dB rms** |
+| IR | Official app | open-stomp 0.4 | open-stomp 0.5 |
+|---|---|---|---|
+| Ampeg 8x10 57 AH | 5.28 dB rms | **1.36 dB rms** | 2.11 dB rms |
+| Ampeg SVT Neumann | 16.13 dB rms, and 45 dB quieter | **5.13 dB rms** | 5.23 dB rms |
 
 The SVT Neumann file starts with 21 ms of silence, so the official upload plays almost none of the cab.
 
-In software, on fifteen Ampeg cab IRs, what the pedal plays is on average 7.9 dB rms from the full IR with the
-official conversion, 2.4 dB with open-stomp 0.4, and 2.2 dB with 0.5. In 0.5 the fit was limited to
-30 Hz–16 kHz: cab IRs have almost nothing above that, and matching it cost taps the rest of the range needed.
+In 0.5 the IR fit covers 30 Hz–16 kHz instead of 25 Hz–20 kHz. In software, on fifteen Ampeg cab IRs, that lowered
+the average error of what the pedal plays from 2.42 to 2.18 dB rms. On the pedal the picture is mixed: on the
+Neumann it is up to 1.8 dB closer at 50–100 Hz, but both IRs lose 1–4 dB in the 32–40 Hz bands, below a bass's low E,
+and that's where these two scores get worse. In the real-playing test above, the 0.5 IR conversion of the Beta52 cab
+improved the overall tone from 2.8 to 2.1 dB.
 
 ## Reproducing these
 
 The scripts are in [`tools/pedalsim`](https://github.com/JackMechem/open-stomp-lib/tree/main/tools/pedalsim):
-`reamp_run.py` drives the re-amp rig, `reamp_analyze.py` and `ir_reamp_analyze.py` score the recordings,
-`readme_plots.py --cached` redraws the graphs above. The real-playing comparison is in
+`readme_plots.py <session>` measures a re-amp session (the `reamp_run.py` test signal, one block at a time) and draws
+the graphs above; `readme_plots.py --cached` redraws them from `tools/pedalsim/results`. The real-playing comparison is in
 [`tools/pedalsim/reamp_compare`](https://github.com/JackMechem/open-stomp-lib/tree/main/tools/pedalsim/reamp_compare).

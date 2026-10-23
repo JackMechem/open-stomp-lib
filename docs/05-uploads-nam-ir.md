@@ -317,6 +317,11 @@ remaining dip at 56–80 Hz is the IR's 384 taps (even the exact model through t
 Fitting G2 and the IR together (895 taps) would reach further, but would tie the AMP slot to one cab.
 `tools/pedalsim/reamp_compare` has the analysis; the docs site shows it interactively.
 
+Sweeps and tones on the Ampeg SVT Gain 10 model, official / 0.4 / 0.5 re-amped in one session against the model in
+software on the pedal's own dry take (rms dB, levels matched): frequency response 4.75 / 3.05 / **2.14**, low end
+(40–160 Hz) 4.95 / 5.35 / **3.51**, note dynamics 9.34 / 5.84 / **2.88**, harmonics 12.16 / 10.85 / **8.60**
+(`tools/pedalsim/readme_plots.py`; the README graphs).
+
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
 ```
@@ -402,6 +407,12 @@ in) official 16.0 dB rms and **46 dB too quiet**, optimised **5.47 dB** at the i
 match the uploaded 384 taps (correlation 0.97–0.99, within about 1.5 dB at 32 Hz and 0.6 dB above). The extra error
 against software is mostly the 32 Hz band, which a 384-sample window resolves poorly. `Device::import_ir_file` uses
 the optimised conversion by default.
+
+**0.5 on hardware** (2026-10-22, official, 0.4 and 0.5 re-amped in one session on the Linux rig, same measure):
+"Ampeg 8x10 57 AH" 5.28 / **1.36** / 2.11 dB rms, "Ampeg SVT Neumann" 16.13 / **5.13** / 5.23 dB rms (the official
+upload 45 dB quieter). The 30 Hz – 16 kHz fit is up to 1.8 dB closer at 50–100 Hz on the Neumann but 1–4 dB further off
+in the 32 and 40 Hz bands on both, which outweighs it in these scores; through a NAM model and the Beta52 cab on real
+playing it improved the overall tone (2.79 → 2.14 dB, "Low end (0.5)" above). `tools/pedalsim/readme_plots.py`.
 
 The first capture (`captures/files/ir/IR01.device_floats.bin`, log marker `imported Jcm800`) was the "percussive verb 1"
 WAV: gain 12.5344, reproduced to −138 dB.
