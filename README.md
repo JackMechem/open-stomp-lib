@@ -1,7 +1,7 @@
 # open-stomp
 
 A Rust library for the SORAN Dual Stomp Lite guitar pedal ·
-Version **0.5.0** · Linux · macOS · Windows · [documentation](https://jackmechem.github.io/open-stomp-lib/) · [changelog](CHANGELOG.md)
+Version **0.5.1** · Linux · macOS · Windows · [documentation](https://jackmechem.github.io/open-stomp-lib/) · [changelog](CHANGELOG.md)
 
 `open-stomp` talks to the **SORAN Dual Stomp Lite** guitar multi-effects pedal (USB `3962:2000`, "JME STOMPBOX")
 over USB-MIDI. It implements the protocol reverse engineered from the vendor's *Stomp Manager* app, and this repo
@@ -37,7 +37,7 @@ The protocol layer has no I/O and no dependencies. The device layer uses [`midir
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.5.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.5.1" }
 ```
 
 ```rust

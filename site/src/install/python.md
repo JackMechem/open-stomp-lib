@@ -9,7 +9,7 @@ connection engine and NAM / IR conversion. Python ≥ 3.9.
 [releases page](https://github.com/JackMechem/open-stomp-lib/releases) and install it:
 
 ```sh
-pip install open_stomp-0.5.0-*.whl
+pip install open_stomp-0.5.1-*.whl
 ```
 
 **From source** (Rust ≥ 1.88; on Linux also the ALSA headers, `libasound2-dev` / `alsa-lib-devel`):

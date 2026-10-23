@@ -6,7 +6,18 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-22
+
+### Added
+- Rename user slots without touching their sound: `Device::rename_user_amp(slot, name)` and
+  `Device::rename_user_ir(slot, name)` (Python too) send only the import's name record (the AMP slot-info write,
+  the IR `0x09` name write) and re-read the slot. The official app can't rename; confirmed on the pedal (a slot's
+  sweep response before and after differs by at most 0.09 dB, rig noise; docs/05, "Renaming a slot"). Names are cut
+  to 31 characters.
+
 ### Changed
+- The activity event for a user AMP slot-info write is "User AMP slot" (it was "User AMP import"), since a rename
+  sends the same record; like "User IR slot".
 - README and docs site: the NAM and IR graphs re-measured on hardware in one session with the official app's, 0.4's
   and 0.5's conversions (`tools/pedalsim/readme_plots.py <session>`, now with a dry-take reference instead of the
   Mac rig's calibration); the real-playing comparison is on the README and the site's front page.
@@ -149,7 +160,8 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.2.0...v0.3.0
