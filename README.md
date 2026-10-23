@@ -1,7 +1,7 @@
 # open-stomp
 
 A Rust library for the SORAN Dual Stomp Lite guitar pedal ·
-Version **0.4.0** · Linux · macOS · Windows · [documentation](https://jackmechem.github.io/open-stomp-lib/) · [changelog](CHANGELOG.md)
+Version **0.5.0** · Linux · macOS · Windows · [documentation](https://jackmechem.github.io/open-stomp-lib/) · [changelog](CHANGELOG.md)
 
 `open-stomp` talks to the **SORAN Dual Stomp Lite** guitar multi-effects pedal (USB `3962:2000`, "JME STOMPBOX")
 over USB-MIDI. It implements the protocol reverse engineered from the vendor's *Stomp Manager* app, and this repo
@@ -35,7 +35,7 @@ The protocol layer has no I/O and no dependencies. The device layer uses [`midir
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.4.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.5.0" }
 ```
 
 ```rust
@@ -139,7 +139,7 @@ up to 15–24 dB in the deep bass, the 400 Hz–1 kHz mids at low input levels a
 open-stomp stays within about 5 dB from 50 Hz to 10 kHz (3.7–4.0 dB rms). It is still short on the 60–100 Hz
 resonance, which 512 taps can't fully reach. Details: [docs/05](docs/05-uploads-nam-ir.md#optimised-conversion).
 
-Since then (unreleased) the NAM fit weights every octave equally and the IR fit skips the empty top octave, which closes
+In 0.5 the NAM fit weights every octave equally and the IR fit skips the empty top octave, which closes
 most of that low-end gap: re-amping a bass DI through the pedal, the error against the model and IR drops from 5.2 to
 3.3 dB at 40–160 Hz and from 3.5 to 2.1 dB over the whole range. See
 [Fixing the low end](https://jackmechem.github.io/open-stomp-lib/analysis/low-end.html) on the docs site, with an

@@ -26,7 +26,7 @@ the pedal, your program can do with the calls below. From Python, see [11](11-py
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.4.0" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.5.0" }
 # or, with a local checkout next to your project:
 open-stomp = { path = "../open-stomp-lib" }
 # protocol only (no MIDI I/O, no dependencies):
