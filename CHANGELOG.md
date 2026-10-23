@@ -6,6 +6,8 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - Unreleased
+
 ### Added
 - Bluetooth (the pedal's Wireless setting), feature `ble`: the engine also scans for the pedal over BLE-MIDI
   (btleplug: CoreBluetooth, BlueZ, WinRT) and lists it as a port `"JME STOMPBOX (Bluetooth)"`, with no pairing.
@@ -179,7 +181,8 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.3.0...v0.4.0

@@ -4,7 +4,7 @@
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.5.1" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.6.0" }
 ```
 
 Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers:
