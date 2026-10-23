@@ -243,7 +243,8 @@ output sounds like the model:
 * **Filters.** Each is a smooth log-magnitude curve at 41 control points (20 Hz × 2^(i/4), linear in log-frequency)
   made minimum-phase by the folded cepstrum (N = 8192) and cut to 512 taps.
 * **Fit.** Multi-resolution STFT log-magnitude L1 distance (windows 4096/1024/256, ¼ hop, 50 ms trimmed from each
-  segment end), plus `1e-3 · mean(max(|u| − 100, 0)²)` to keep `u = G1 ⊛ x` inside the range `f` was fitted on, plus
+  segment end), each bin weighted ∝ 1/f above 40 Hz so every octave counts about the same (`Weighting::Octave`,
+  since 0.5; see "Low end" below), plus `1e-3 · mean(max(|u| − 100, 0)²)` to keep `u = G1 ⊛ x` inside the range `f` was fitted on, plus
   `1e-3 ·` the mean squared second difference of each curve. Adam, 300 steps, learning rate 0.05 with a 10-step
   warm-up and cosine decay, starting from the `Measure::Clean` conversion; the best step is kept. Gradients are
   written out by hand and checked against PyTorch's autograd (`tests/data/optim`) and finite differences. About a
@@ -265,7 +266,41 @@ Recorded in the same session as the prototype's second upload (6.86) and the off
 drifted 0.01 dB since the first session). The Rust port differs from the prototype only in leaving out the rig's dry-path EQ from the target (≤ 0.4 dB) and in
 its pink-noise generator. Still missing on hardware: the overall level is 3–5 dB low and the model's 60–100 Hz
 resonance is up to ~10 dB short. 512 taps (10.7 ms) can't resolve it fully, and the harmonics are limited by the
-pedal's fixed `f`.
+pedal's fixed `f`. (The table above is the 0.3/0.4 conversion, with the flat weighting.)
+
+#### Low end (0.5)
+
+A re-amp of real bass playing (Ampeg SVT-VR Classic "Normal" model plus an IR, 2026-10-22) found the 0.4 conversion
+6–11 dB short at 50–80 Hz while matching the model within ~2–3 dB above 200 Hz; the official conversion, through
+the same IR and pedal, was closer there. What it showed:
+
+* **The simulator is right at the low end.** It predicts the recorded sweep responses of both the official and
+  the 0.4 upload within ~0.5 dB in every band from 32 to 318 Hz, so the gap was the fit's choice.
+* **The loss gave the low end away.** STFT bins are evenly spaced in Hz: below 120 Hz is ~0.5% of the 4096-point
+  bins and one or two of the shorter windows' bins. `Weighting::Octave` weights each bin ∝ 1/f above 40 Hz (flat
+  20–40 Hz, nothing below 20 Hz, mean 1 per resolution); `Weighting::Flat` is the old loss (the PyTorch reference
+  tests use it).
+* **What 512 taps can do.** Fitting minimum-phase filters straight to the SVT G10 model's linear response (a +20 dB
+  resonance at 63–80 Hz above a ~33 dB/octave cut), the best possible 40–160 Hz error is 7.0 dB rms for 384 taps,
+  4.1 for 512, 2.3 for 895 (G2 and the cab IR back to back), 2.1 for 1023 (G1 and G2 together), 0 for 2048.
+  With octave weighting the fit reaches the 512-tap limit at 63/79 Hz.
+
+Simulated, 300 steps, flat → octave weighting (rms dB; low end = 40–160 Hz sweep error with the mid level
+removed; the harmonics score is unreliable on clean models, whose 3rd/5th harmonics sit near the noise floor):
+
+| Model | Freq. response | Note level | Low end |
+|---|---|---|---|
+| Ampeg SVT-VR Classic (Normal) | 2.49 → 1.21 | 2.12 → 0.60 | 4.92 → 2.07 |
+| Ampeg SVT Gain 10 Ultra Lo and Hi MD 421 | 5.79 → 5.56 | 4.47 → 4.74 | 8.15 → 7.00 |
+| Ampeg SVT Ultra Lo MD 421 | 3.31 → 2.79 | 1.85 → 1.70 | 4.83 → 3.39 |
+| Orange Terror Bass (Clean) | 1.33 → 0.86 | 1.27 → 0.71 | 1.13 → 0.73 |
+| Orange Terror Bass (Dirt) | 2.16 → 1.99 | 2.20 → 1.70 | 1.33 → 1.55 |
+| Marshall JCM800 (guitar) | 4.00 → 3.71 | 2.73 → 1.08 | 6.07 → 4.79 |
+
+Amp-only models (the cab comes from an IR) have a gentle low end that 512 taps can follow, and gain the most.
+Models with the cab captured in them keep a resonance the filters are too short for. Starting G1 with a steep low cut
+(so G1 makes the cut and G2 the resonance) gained another ~1 dB at 63–79 Hz on the G10 in the PyTorch prototype; not
+adopted. Not yet confirmed on hardware.
 
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 

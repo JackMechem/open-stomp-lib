@@ -6,6 +6,15 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Changed
+- `nam::optimise`: the loss now weights frequencies so each octave counts about the same
+  (`Options::weighting`, `Weighting::Octave`, the new default). The old flat weighting gave the bottom octave
+  ~0.5% of the fit, and imports came out 5–10 dB short at 50–160 Hz. In simulation the low-end error (40–160 Hz)
+  of the Ampeg SVT-VR Classic (Normal) model drops from 4.9 to 2.1 dB rms and the frequency response error from
+  2.5 to 1.2 dB; the frequency response improves on all six models tried, the low end on five (docs/05, "Low
+  end"). `Weighting::Flat` keeps the old loss;
+  example `nam_optimise --flat`. Not yet confirmed on hardware.
+
 ## [0.4.0] - 2026-10-22
 
 ### Added

@@ -2,8 +2,10 @@
 //! simulation of the pedal, starting from the clean conversion.
 //!
 //! ```sh
-//! cargo run --release --example nam_optimise -- model.nam [out.bin] [--steps N] [--normalise]
+//! cargo run --release --example nam_optimise -- model.nam [out.bin] [--steps N] [--normalise] [--flat]
 //! ```
+//!
+//! `--flat` fits with the flat loss weighting of 0.4 and earlier instead of the octave weighting.
 //!
 //! `out.bin` gets the 2048 little-endian floats (`Device::import_user_amp` takes them as a slice).
 
@@ -17,7 +19,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.drain(i..i + 2);
     }
     let normalise = args.iter().position(|a| a == "--normalise").map(|i| args.remove(i)).is_some();
-    let path = args.first().ok_or("usage: nam_optimise <model.nam> [out.bin] [--steps N] [--normalise]")?;
+    if let Some(i) = args.iter().position(|a| a == "--flat") {
+        options.weighting = optimise::Weighting::Flat;
+        args.remove(i);
+    }
+    let path = args.first().ok_or("usage: nam_optimise <model.nam> [out.bin] [--steps N] [--normalise] [--flat]")?;
     let mut model = Model::load(path)?;
     let t = std::time::Instant::now();
     let clean = convert::convert_measured(&mut model, &convert::excitation(), convert::Measure::Clean);

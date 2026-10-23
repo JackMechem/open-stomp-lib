@@ -679,17 +679,44 @@ impl Resolution {
     }
 }
 
+/// How the loss weights the STFT bins.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Weighting {
+    /// Every bin the same: the bins are evenly spaced in Hz, so the octave below 100 Hz gets about
+    /// 0.5% of the weight and the fit gives the low end away (the hardware-validated 0.3 loss).
+    Flat,
+    /// Bin weights ∝ 1/f above 40 Hz (each octave counts about the same), flat from 20 to 40 Hz,
+    /// nothing below 20 Hz; normalised to mean 1 per resolution.
+    Octave,
+}
+
+impl Weighting {
+    /// The weight of each bin (0..=n/2) of an `n`-point STFT.
+    fn bins(self, n: usize) -> Vec<f64> {
+        let f = |k: usize| k as f64 * SR as f64 / n as f64;
+        let w: Vec<f64> = match self {
+            Weighting::Flat => vec![1.0; n / 2 + 1],
+            Weighting::Octave => (0..=n / 2).map(|k| if f(k) < 20.0 { 0.0 } else { 1.0 / f(k).max(40.0) }).collect(),
+        };
+        let mean = w.iter().sum::<f64>() / w.len() as f64;
+        w.iter().map(|v| v / mean).collect()
+    }
+}
+
 /// Multi-resolution STFT log-magnitude L1 distance to a target, over segments.
 struct SpecLoss {
     res: Vec<Resolution>,
+    /// Per resolution, the weight of each bin.
+    weights: Vec<Vec<f64>>,
     /// `(start, end, floor, log |STFT(target)| per resolution)`; floor = 1e-3 · rms(target) · √n is
     /// added to every magnitude.
     parts: Vec<(usize, usize, f64, Vec<Vec<f64>>)>,
 }
 
 impl SpecLoss {
-    fn new(target: &[f64], slices: &[(usize, usize)]) -> Self {
+    fn new(target: &[f64], slices: &[(usize, usize)], weighting: Weighting) -> Self {
         let res: Vec<Resolution> = RESOLUTIONS.iter().map(|&(n, h)| Resolution::new(n, h)).collect();
+        let weights = res.iter().map(|r| weighting.bins(r.n)).collect();
         let parts = slices
             .iter()
             .map(|&(a, b)| {
@@ -705,7 +732,7 @@ impl SpecLoss {
                 (a, b, eps, logs)
             })
             .collect();
-        SpecLoss { res, parts }
+        SpecLoss { res, weights, parts }
     }
 
     /// The loss of `y` and its gradient (added to `gy`).
@@ -719,13 +746,15 @@ impl SpecLoss {
             let e = eps * (res.n as f64).sqrt();
             let mut s = res.stft(&y[*a..*b]);
             let k = scale / s.len() as f64;
+            let w = &self.weights[r];
             let mut sum = 0.0;
-            for (c, t) in s.iter_mut().zip(&logs[r]) {
+            for (i, (c, t)) in s.iter_mut().zip(&logs[r]).enumerate() {
+                let wi = w[i % w.len()];
                 let m = c.norm();
                 let d = (m + e).ln() - t;
-                sum += d.abs();
-                // d|d|/dS = sign(d) / (|S| + e) · S / |S|
-                *c = if m > 0.0 { *c * (k * d.signum() / ((m + e) * m)) } else { Complex64::default() };
+                sum += wi * d.abs();
+                // d(w|d|)/dS = w · sign(d) / (|S| + e) · S / |S|
+                *c = if m > 0.0 { *c * (k * wi * d.signum() / ((m + e) * m)) } else { Complex64::default() };
             }
             let mut g = vec![0.0; b - a];
             res.stft_adjoint(&s, &mut g);
@@ -745,10 +774,11 @@ impl SpecLoss {
     fn value(&self, y: &[f64]) -> f64 {
         let mut tot = 0.0;
         for (a, b, eps, logs) in &self.parts {
-            for (r, t) in self.res.iter().zip(logs) {
+            for ((r, t), w) in self.res.iter().zip(logs).zip(&self.weights) {
                 let e = eps * (r.n as f64).sqrt();
                 let m = r.magnitude(&y[*a..*b]);
-                tot += m.iter().zip(t).map(|(m, t)| ((m + e).ln() - t).abs()).sum::<f64>() / m.len() as f64;
+                tot += m.iter().zip(t).enumerate().map(|(i, (m, t))| w[i % w.len()] * ((m + e).ln() - t).abs()).sum::<f64>()
+                    / m.len() as f64;
             }
         }
         tot / (self.parts.len() * self.res.len()) as f64
@@ -774,11 +804,13 @@ pub struct Options {
     pub warmup: usize,
     /// Weight of the curve smoothness term (mean squared second difference of each curve).
     pub smoothness: f64,
+    /// How the loss weights frequencies.
+    pub weighting: Weighting,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Options { steps: 300, learning_rate: 0.05, warmup: 10, smoothness: 1e-3 }
+        Options { steps: 300, learning_rate: 0.05, warmup: 10, smoothness: 1e-3, weighting: Weighting::Octave }
     }
 }
 
@@ -816,8 +848,8 @@ struct Eval {
 }
 
 impl Problem {
-    fn new(x: &[f64], target: &[f64], slices: &[(usize, usize)]) -> Self {
-        Problem { sim: Simulator::new(x), loss: SpecLoss::new(target, slices), curves: Curves::new() }
+    fn new(x: &[f64], target: &[f64], slices: &[(usize, usize)], weighting: Weighting) -> Self {
+        Problem { sim: Simulator::new(x), loss: SpecLoss::new(target, slices, weighting), curves: Curves::new() }
     }
 
     /// The objective for two curves, and its gradient w.r.t. them.
@@ -901,7 +933,7 @@ pub fn optimise_with_progress(
 ) -> Optimised {
     let signal = test_signal();
     let target = render_target(model, &signal.x);
-    let problem = Problem::new(&signal.x, &target, &train_slices(&signal.segments));
+    let problem = Problem::new(&signal.x, &target, &train_slices(&signal.segments), options.weighting);
     let (h1, h2) = super::convert::pedal_irs(init);
     let c0 = [problem.curves.of(&h1), problem.curves.of(&h2)];
     let initial_loss = problem.evaluate(&c0, options.smoothness).value;
@@ -963,7 +995,7 @@ mod tests {
                 (a + TRIM, a + l - TRIM)
             })
             .collect();
-        let loss = SpecLoss::new(&golden("sim_tgt"), &slices);
+        let loss = SpecLoss::new(&golden("sim_tgt"), &slices, Weighting::Flat);
         let v = loss.value(&golden("sim_y"));
         let want = m["loss"].as_f64().unwrap();
         assert!((v - want).abs() < 1e-10 * want, "{v} vs {want}");
@@ -1060,7 +1092,7 @@ mod tests {
 
     #[test]
     fn loss_gradient_matches_reference() {
-        let loss = SpecLoss::new(&golden("sim_tgt"), &golden_slices());
+        let loss = SpecLoss::new(&golden("sim_tgt"), &golden_slices(), Weighting::Flat);
         let y = golden("sim_y");
         let mut gy = vec![0.0; y.len()];
         let v = loss.value_grad(&y, &mut gy);
@@ -1071,7 +1103,7 @@ mod tests {
     #[test]
     fn loss_gradient_is_numerically_right() {
         let slices = golden_slices();
-        let loss = SpecLoss::new(&golden("sim_tgt"), &slices);
+        let loss = SpecLoss::new(&golden("sim_tgt"), &slices, Weighting::Flat);
         let y = golden("sim_y");
         let mut gy = vec![0.0; y.len()];
         loss.value_grad(&y, &mut gy);
@@ -1087,11 +1119,43 @@ mod tests {
     }
 
     #[test]
+    fn octave_weights() {
+        assert!(Weighting::Flat.bins(256).iter().all(|&w| w == 1.0));
+        let n = 4096;
+        let w = Weighting::Octave.bins(n);
+        let bin = |f: f64| (f * n as f64 / SR as f64).round() as usize;
+        assert!((w.iter().sum::<f64>() / w.len() as f64 - 1.0).abs() < 1e-12);
+        assert_eq!((w[0], w[bin(10.0)]), (0.0, 0.0));
+        assert!((w[bin(25.0)] - w[bin(35.0)]).abs() < 1e-12, "flat below 40 Hz");
+        let (lo, hi) = (bin(100.0), bin(1000.0));
+        let ratio = w[lo] / w[hi];
+        assert!((ratio - hi as f64 / lo as f64).abs() < 1e-12, "1/f: {ratio}");
+    }
+
+    #[test]
+    fn weighted_loss_gradient_is_numerically_right() {
+        let slices = golden_slices();
+        let loss = SpecLoss::new(&golden("sim_tgt"), &slices, Weighting::Octave);
+        let y = golden("sim_y");
+        let mut gy = vec![0.0; y.len()];
+        let v = loss.value_grad(&y, &mut gy);
+        assert!((v - loss.value(&y)).abs() < 1e-12 * v);
+        for i in [slices[0].0, slices[0].0 + 1000, slices[0].1 - 1, slices[1].0 + 3] {
+            let d = 1e-6 * y[i].abs().max(1e-3);
+            let (mut p, mut m) = (y.clone(), y.clone());
+            p[i] += d;
+            m[i] -= d;
+            let num = (loss.value(&p) - loss.value(&m)) / (2.0 * d);
+            assert!((num - gy[i]).abs() < 1e-4 * num.abs().max(1e-6), "sample {i}: {num} vs {}", gy[i]);
+        }
+    }
+
+    #[test]
     fn optimiser_steps_match_reference() {
-        let problem = Problem::new(&golden("sim_x"), &golden("sim_tgt"), &golden_slices());
+        let problem = Problem::new(&golden("sim_x"), &golden("sim_tgt"), &golden_slices(), Weighting::Flat);
         let c0 = golden("opt_c0");
         let want = golden("opt_loss");
-        let o = Options { steps: want.len(), ..Options::default() };
+        let o = Options { steps: want.len(), weighting: Weighting::Flat, ..Options::default() };
         let c = [c0[..CURVE_POINTS].to_vec(), c0[CURVE_POINTS..].to_vec()];
         // each loss after the first follows an Adam step, so this checks the updates too
         let (_, _, history) = problem.fit(c, &o, &mut |_, _| true);
@@ -1100,7 +1164,7 @@ mod tests {
 
     #[test]
     fn optimiser_reports_progress_and_stops_early() {
-        let problem = Problem::new(&golden("sim_x"), &golden("sim_tgt"), &golden_slices());
+        let problem = Problem::new(&golden("sim_x"), &golden("sim_tgt"), &golden_slices(), Weighting::Flat);
         let c0 = golden("opt_c0");
         let c = [c0[..CURVE_POINTS].to_vec(), c0[CURVE_POINTS..].to_vec()];
         let mut seen = vec![];
