@@ -1,7 +1,7 @@
 # open-stomp
 
 A Rust library for the SORAN Dual Stomp Lite guitar pedal ·
-Version **0.4.0** · Linux · macOS · Windows · [changelog](CHANGELOG.md)
+Version **0.4.0** · Linux · macOS · Windows · [documentation](https://jackmechem.github.io/open-stomp-lib/) · [changelog](CHANGELOG.md)
 
 `open-stomp` talks to the **SORAN Dual Stomp Lite** guitar multi-effects pedal (USB `3962:2000`, "JME STOMPBOX")
 over USB-MIDI. It implements the protocol reverse engineered from the vendor's *Stomp Manager* app, and this repo
@@ -139,6 +139,12 @@ up to 15–24 dB in the deep bass, the 400 Hz–1 kHz mids at low input levels a
 open-stomp stays within about 5 dB from 50 Hz to 10 kHz (3.7–4.0 dB rms). It is still short on the 60–100 Hz
 resonance, which 512 taps can't fully reach. Details: [docs/05](docs/05-uploads-nam-ir.md#optimised-conversion).
 
+Since then (unreleased) the NAM fit weights every octave equally and the IR fit skips the empty top octave, which closes
+most of that low-end gap: re-amping a bass DI through the pedal, the error against the model and IR drops from 5.2 to
+3.3 dB at 40–160 Hz and from 3.5 to 2.1 dB over the whole range. See
+[Fixing the low end](https://jackmechem.github.io/open-stomp-lib/analysis/low-end.html) on the docs site, with an
+interactive comparison.
+
 ## IR conversion: closer to the real cab than the official app
 
 The pedal plays only the first 384 taps (8 ms) of a user IR. The official app uploads the start of the file as it
@@ -182,6 +188,9 @@ Live CCs are verified on hardware. Preset and settings **writes** match the offi
 yet been run on hardware from this code. Back up your presets first.
 
 ## Documentation
+
+**The [documentation site](https://jackmechem.github.io/open-stomp-lib/)** has everything below plus install guides, the app's docs, the NAM / IR
+analysis with interactive graphs, and the API reference. It is built from `site/` and the docs here.
 
 This repository is the home of the protocol and reverse-engineering documentation. The app's own docs (user guide,
 building, architecture) are in [open-stomp-manager](https://github.com/JackMechem/open-stomp-manager).
@@ -237,8 +246,10 @@ tests/            capture-driven integration tests (fake pedal, engine replay), 
                   NeuralAmpModelerCore (tests/data/nam: its MIT example models + reference outputs)
 captures/logs/    capture logs of the official app and the pedal: the test vectors
 docs/             the protocol documentation and the library guide
+site/             the documentation site (mdBook; site/assemble.py pulls in both repos' docs)
 tools/pedalsim/   the analysis behind the optimised NAM conversion (Python): re-amp rig, pedal
                   simulator, PyTorch prototype of the optimiser, scoring, README graphs
+project.md        project notes and roadmap
 ```
 
 The capture/decoding tools and static-analysis artefacts that produced the docs live in the
