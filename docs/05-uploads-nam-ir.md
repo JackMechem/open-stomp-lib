@@ -366,7 +366,8 @@ SV Bass and Mes 400 Bass with the same knobs, and two models 6 dB apart raw land
 3. A minimum-phase filter with that response (folded cepstrum, 32768 points): no leading delay, energy packed into
    the start. A few iterations correct the design for what the 384 taps (faded over the last 48) actually produce.
 4. Then the taps themselves are fitted (Adam, 400 steps, hand-written gradient through the FFT) to the full IR's
-   levels in 1/6-octave bands every 1/12 octave from 25 Hz to 20 kHz, level left free.
+   levels in 1/6-octave bands every 1/12 octave from 30 Hz to 16 kHz, level left free. (Until 0.4 the fit ran
+   25 Hz – 20 kHz; a cab IR has next to nothing above 16 kHz, and matching that cost taps the rest needs.)
 5. Level: what the app means to give the IR, its own gain rule on the first 2048 samples counted from the IR's onset,
    matched over 100 Hz – 8 kHz. The unused 1664 samples of the upload are zero.
 
@@ -375,12 +376,12 @@ the pedal plays against the full IR, 31.5 Hz – 16 kHz, level difference remove
 
 | IRs | Official conversion | Optimised |
 |---|---|---|
-| 8 × "8x10" cab IRs (mic'd, start at sample 0) | 2.5 – 5.4 dB rms, worst band +7 … +23 dB (sub-bass) | 1.0 – 3.5 dB rms |
-| 5 × "SVT" IRs that start after 384 samples | 12.7 – 14.2 dB rms, **38–44 dB too quiet** (the pedal plays the silence before the IR) | 2.7 – 2.9 dB rms, level within 0.4 dB |
-| 2 × DI recordings that start after 2048 samples | 9.9 – 13.6 dB rms, 34 dB too quiet | 2.8 – 3.3 dB rms |
-| Mean | 7.94 dB | 2.42 dB |
+| 8 × "8x10" cab IRs (mic'd, start at sample 0) | 2.5 – 5.4 dB rms, worst band +7 … +23 dB (sub-bass) | 0.9 – 3.2 dB rms (0.4: 1.0 – 3.5) |
+| 5 × "SVT" IRs that start after 384 samples | 12.7 – 14.2 dB rms, **38–44 dB too quiet** (the pedal plays the silence before the IR) | 2.3 – 2.4 dB rms (0.4: 2.7 – 2.9), level within 0.4 dB |
+| 2 × DI recordings that start after 2048 samples | 9.9 – 13.6 dB rms, 34 dB too quiet | 2.9 – 3.6 dB rms (0.4: 2.8 – 3.3); "D-I-Out Hot" plays 16 dB quiet (the level rule; unchanged) |
+| Mean | 7.94 dB | 2.18 dB (0.4: 2.42) |
 
-**On hardware** (re-amped, the CAB block alone, measured response against the full IR, same measure): "Ampeg 8x10 57
+**On hardware** (the 0.4 conversion; re-amped, the CAB block alone, measured response against the full IR, same measure): "Ampeg 8x10 57
 AH" official 4.78 dB rms, optimised **2.07 dB** at the same level (+0.3 dB); "Ampeg SVT Neumann" (starts 1030 samples
 in) official 16.0 dB rms and **46 dB too quiet**, optimised **5.47 dB** at the intended level. The recorded responses
 match the uploaded 384 taps (correlation 0.97–0.99, within about 1.5 dB at 32 Hz and 0.6 dB above). The extra error

@@ -14,6 +14,10 @@ All notable changes to `open-stomp`. The format follows
   2.5 to 1.2 dB; the frequency response improves on all six models tried, the low end on five (docs/05, "Low
   end"). `Weighting::Flat` keeps the old loss;
   example `nam_optimise --flat`. Not yet confirmed on hardware.
+- `ir::convert_optimised`: the tap fit now covers 30 Hz – 16 kHz instead of 25 Hz – 20 kHz. Cab IRs have next to
+  nothing above 16 kHz, and matching it cost taps the rest of the range needs: on fifteen Ampeg IRs the 1/3-octave
+  error of what the pedal plays drops from 2.42 to 2.18 dB rms (better on 13; the two DI recordings get slightly
+  worse), and the 40–160 Hz error from 3.55 to 2.90 dB.
 
 ## [0.4.0] - 2026-10-22
 

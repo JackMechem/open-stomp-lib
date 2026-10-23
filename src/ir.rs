@@ -411,13 +411,20 @@ fn min_phase(mag: &[f64], taps: usize) -> Vec<f64> {
     c[..taps].iter().map(|v| v.re / n as f64).collect()
 }
 
-/// Bands of the fit: 1/6 octave wide, every 1/12 octave from 25 Hz to 20 kHz, as bin ranges of an
-/// `n`-point FFT at 48 kHz.
+/// Range of the fit (Hz). A cab IR has next to nothing above 16 kHz (−80 dB and below), and
+/// matching that costs taps the rest of the range needs.
+#[cfg(feature = "nam")]
+const FIT_LO_HZ: f64 = 30.0;
+#[cfg(feature = "nam")]
+const FIT_HI_HZ: f64 = 16000.0;
+
+/// Bands of the fit: 1/6 octave wide, every 1/12 octave from [`FIT_LO_HZ`] to [`FIT_HI_HZ`], as
+/// bin ranges of an `n`-point FFT at 48 kHz.
 #[cfg(feature = "nam")]
 fn fit_bands(n: usize) -> Vec<std::ops::Range<usize>> {
     let hz = |f: f64| f * n as f64 / IR_SAMPLE_RATE as f64;
-    std::iter::successors(Some(25.0f64), |f| Some(f * 2f64.powf(1.0 / 12.0)))
-        .take_while(|&f| f <= 20000.0)
+    std::iter::successors(Some(FIT_LO_HZ), |f| Some(f * 2f64.powf(1.0 / 12.0)))
+        .take_while(|&f| f <= FIT_HI_HZ)
         .map(|f| {
             let (lo, hi) = (hz(f / SMOOTH).floor() as usize, hz(f * SMOOTH).ceil() as usize);
             lo..hi.max(lo + 1)
