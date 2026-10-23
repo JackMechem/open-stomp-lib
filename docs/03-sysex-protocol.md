@@ -69,7 +69,7 @@ Seen:
 |---|---|---|---|---|---|
 | `0x09` | User IR slot info (index, CRC, name) | `70 09 00 <slot>` | `70 09 01 <slot> <packed>` | slot byte + packed | confirmed |
 | `0x0B` | Preset (by index) | `70 0B 00 <idx> 00*13` | `70 0B 01 <packed 126 B>` | packed (whole body) | confirmed |
-| `0x0C` | Current / edit-buffer preset | `70 0C 00` | ? | packed, same layout as `0x0B` (index field 0) | read confirmed |
+| `0x0C` | Current / edit-buffer preset | `70 0C 00 00*14` | ? | packed, same layout as `0x0B` (index field 0) | read confirmed |
 | `0x0D` | Module link / chain *(static)* | | | | not seen |
 | `0x10` | **User IR upload** (data chunks) | | `70 10 01 <packed chunk>` | packed | confirmed |
 | `0x12` | Preset name | | `70 12 01 <slot?> <16 B ASCII>` | **plain** ASCII | confirmed |

@@ -130,8 +130,11 @@ pub mod req {
     pub fn tuner() -> Vec<u8> {
         frame(Cmd::Tuner, Dir::Read, &[])
     }
+    /// Padded with 14 zero bytes like the official app's request: the pedal takes request
+    /// parameters from those bytes, and a bare request makes it read whatever the previous message
+    /// left in its buffer (seen over BLE: empty or truncated replies).
     pub fn edit_buffer() -> Vec<u8> {
-        frame(Cmd::EditBuffer, Dir::Read, &[])
+        frame(Cmd::EditBuffer, Dir::Read, &[0; 14])
     }
     pub fn ir_slot(slot: u8) -> Vec<u8> {
         frame(Cmd::IrSlot, Dir::Read, &[slot])
