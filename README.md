@@ -42,6 +42,9 @@ The protocol layer has no I/O and no dependencies. The device layer uses [`midir
 open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.6.1" }
 ```
 
+Or follow a channel instead of a version (`cargo update` moves it): `branch = "stable"` for the newest release,
+`branch = "unstable"` for the newest release or pre-release.
+
 ```rust
 use open_stomp::device::{Config, Device, Update};
 use open_stomp::{DeviceState, Module};
@@ -257,7 +260,16 @@ To release:
    `scripts/check-version.sh` checks all of this (CI runs it too).
 2. Commit, then `git tag vx.y.z && git push --tags`. The release workflow tests the tag and publishes a GitHub
    release with the changelog section as its notes.
-3. Point dependents at the new tag (Open Stomp Manager: `OPEN_STOMP_LIB_REF` in its workflows).
+3. Point dependents at the new tag (Open Stomp Manager: `OPEN_STOMP_LIB_REF` in its workflows, and
+   `nix flake update open-stomp-lib` there once the `stable` branch has moved).
+
+A pre-release is a tag with a suffix, `vx.y.z-beta.n` (with that version in `Cargo.toml`). It needs no README or
+CHANGELOG changes (its notes are the `[Unreleased]` section) and is published as a GitHub pre-release.
+
+**Channels.** After each successful release, `.github/workflows/channels.yml` moves two branches
+(`scripts/update-channels.sh`): `stable` to the newest release and `unstable` to the newest release or
+pre-release. Ticking or clearing a release's pre-release box, or deleting it, moves them again; Actions → Channels →
+Run workflow re-syncs them by hand.
 
 ## Repository layout
 

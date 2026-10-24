@@ -14,9 +14,12 @@ fail() { echo "error: $*" >&2; ok=0; }
 
 [[ -n "$v" ]] || fail "no version in Cargo.toml"
 [[ $# -eq 0 || "$1" == "$v" ]] || fail "expected version $1, Cargo.toml has $v"
-grep -q "Version \*\*$v\*\*" README.md || fail "README.md does not say 'Version **$v**'"
-grep -q "^## \[$v\]" CHANGELOG.md || fail "CHANGELOG.md has no '## [$v]' section"
-grep -q "tag = \"v$v\"" README.md || fail "README.md install snippet does not pin tag v$v"
+# a pre-release (0.6.0-beta.1) leaves the README and CHANGELOG on the last stable release
+if [[ "$v" != *-* ]]; then
+    grep -q "Version \*\*$v\*\*" README.md || fail "README.md does not say 'Version **$v**'"
+    grep -q "^## \[$v\]" CHANGELOG.md || fail "CHANGELOG.md has no '## [$v]' section"
+    grep -q "tag = \"v$v\"" README.md || fail "README.md install snippet does not pin tag v$v"
+fi
 awk '/name = "open-stomp"/{getline; print}' Cargo.lock | grep -q "\"$v\"" || fail "Cargo.lock is stale (run cargo build)"
 awk '/name = "open-stomp-python"/{getline; print}' Cargo.lock | grep -q "\"$v\"" || fail "Cargo.lock is stale for the Python bindings"
 

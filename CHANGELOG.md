@@ -6,6 +6,10 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Added
+- Release channels: the `stable` branch follows the newest release and `unstable` the newest release or pre-release
+  (`vx.y.z-beta.n` tags, published as GitHub pre-releases). Follow one from Nix or cargo instead of a version tag.
+
 ## [0.6.1] - 2026-10-24
 
 ### Fixed

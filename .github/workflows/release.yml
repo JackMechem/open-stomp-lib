@@ -2,7 +2,8 @@ name: Release
 
 # Push a tag `vX.Y.Z` matching Cargo.toml to test it and publish a GitHub release with the
 # CHANGELOG.md section as notes and the Python wheels attached. Dependents pin the tag (git
-# dependency or sibling checkout).
+# dependency or sibling checkout). A tag with a pre-release suffix (vX.Y.Z-beta.N) is published as a
+# pre-release. channels.yml then moves the stable / unstable branches.
 on:
   push:
     tags: ["v*"]
@@ -29,8 +30,11 @@ jobs:
         run: |
           v=${GITHUB_REF_NAME#v}
           awk -v v="$v" '/^## \[/{p = index($0, "[" v "]") > 0; next} p' CHANGELOG.md > notes.md
+          # a pre-release (vx.y.z-beta.n) needs no section of its own: fall back to [Unreleased]
+          [[ -s notes.md || "$v" != *-* ]] || awk '/^## \[/{p = index($0, "[Unreleased]") > 0; next} p' CHANGELOG.md > notes.md
       - uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body_path: notes.md
 
   wheels:
@@ -70,6 +74,7 @@ jobs:
           python -c "import open_stomp; print(open_stomp.__version__, open_stomp.Module.AMP.models[8])"
       - uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: bindings/python/dist/*.whl
 
   sdist:
@@ -84,4 +89,5 @@ jobs:
           args: --out dist
       - uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: bindings/python/dist/*.tar.gz
