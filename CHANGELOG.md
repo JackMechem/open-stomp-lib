@@ -6,6 +6,12 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-24
+
+### Fixed
+- CI only: the docs-site and release jobs now install the D-Bus headers the `ble` default feature
+  needs on Linux. No library changes from 0.6.0.
+
 ## [0.6.0] - 2026-10-23
 
 ### Added
@@ -181,7 +187,8 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.4.0...v0.5.0
