@@ -21,7 +21,7 @@ jobs:
       - name: Check tag matches Cargo.toml
         run: scripts/check-version.sh "${GITHUB_REF_NAME#v}"
       - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev libdbus-1-dev
       - uses: Swatinem/rust-cache@v2
       - run: cargo test
       - run: cargo test --no-default-features
