@@ -4,11 +4,14 @@
 The docs stay where they are (docs/ here, docs/ in open-stomp-manager) so they still read well on GitHub; this
 script copies them into site/src/lib and site/src/manager (both git-ignored) and rewrites the links that point
 outside the docs: source files and READMEs go to GitHub, links between the two repositories' docs stay on the site.
+It also writes site/theme/versions.js (git-ignored): both versions, shown at the top of the sidebar.
 
 usage: site/assemble.py [path to an open-stomp-manager checkout]   (default: ../open-stomp-manager)
 """
+import json
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -61,10 +64,25 @@ def changelog(repo_dir: Path, dest: Path, repo: str) -> None:
     (dest / "CHANGELOG.md").write_text(LINK.sub(lambda m: "](" + fix(m[1]) + ")", text))
 
 
+def version(repo_dir: Path) -> dict:
+    """The version in the workspace Cargo.toml, and how many commits HEAD is past its release tag
+    (None when the tag isn't there, e.g. in a shallow clone)."""
+    v = re.search(r'^version = "([^"]+)"', (repo_dir / "Cargo.toml").read_text(), re.M)[1]
+
+    def git(*args: str) -> str | None:
+        r = subprocess.run(["git", "-C", str(repo_dir), *args], capture_output=True, text=True)
+        return r.stdout.strip() if r.returncode == 0 else None
+
+    ahead = git("rev-list", "--count", f"v{v}..HEAD")
+    return {"version": v, "ahead": int(ahead) if ahead is not None else None, "commit": git("rev-parse", "--short", "HEAD")}
+
+
 if not (MANAGER / "docs").is_dir():
     sys.exit(f"no open-stomp-manager checkout at {MANAGER} (pass its path)")
 copy(LIB / "docs", SRC / "lib", "open-stomp-lib")
 copy(MANAGER / "docs", SRC / "manager", "open-stomp-manager")
 changelog(LIB, SRC / "lib", "open-stomp-lib")
 changelog(MANAGER, SRC / "manager", "open-stomp-manager")
+versions = {"lib": version(LIB), "manager": version(MANAGER)}
+(LIB / "site" / "theme" / "versions.js").write_text(f"window.openStompVersions = {json.dumps(versions)};\n")
 print("assembled", SRC / "lib", "and", SRC / "manager")

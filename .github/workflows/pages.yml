@@ -26,11 +26,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # full history and tags, so site/assemble.py can tell whether main is past the last release
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/checkout@v5
         with:
           repository: JackMechem/open-stomp-manager
           path: open-stomp-manager
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - name: Install ALSA headers
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libdbus-1-dev

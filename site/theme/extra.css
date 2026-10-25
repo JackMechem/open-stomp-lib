@@ -13,3 +13,10 @@ table { display: block; overflow-x: auto; }
 .feature-button { display: inline-block; padding: 0.55em 1.1em; border-radius: 6px; background: var(--links);
   color: var(--bg) !important; font-weight: 600; text-decoration: none !important; margin-right: 1em; }
 .feature-button:hover { filter: brightness(1.1); }
+
+/* Which versions the docs are for, at the top of the sidebar (theme/version-banner.js). */
+.docs-versions { position: sticky; top: -10px; z-index: 1; margin: -10px -10px 0.8em; padding: 0.8em 18px 0.6em;
+  background: var(--sidebar-bg); border-bottom: 1px solid var(--sidebar-spacer); font-size: 0.85em; line-height: 1.5; }
+.docs-versions-label { opacity: 0.7; }
+.docs-versions a { display: block; color: var(--sidebar-fg); font-weight: 600; }
+.docs-versions .unreleased { font-weight: normal; opacity: 0.7; }

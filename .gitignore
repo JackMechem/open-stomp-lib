@@ -13,3 +13,4 @@ dist/
 site/book/
 site/src/lib/
 site/src/manager/
+site/theme/versions.js
