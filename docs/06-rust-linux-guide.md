@@ -31,7 +31,7 @@ your own instead, these are the pieces it uses or that are worth considering:
 | (alt) raw ALSA | [`alsa`](https://crates.io/crates/alsa) | rawmidi if you want full control over SysEx buffering |
 | macOS hotplug | [`core-foundation-sys`](https://crates.io/crates/core-foundation-sys) | CoreMIDI delivers device add/remove notifications on the creating thread's run loop |
 | Channels | `std::sync::mpsc`, `crossbeam-channel` or `tokio` | midir's input callback runs on its own thread |
-| GUI | `egui`/`eframe` (what Open Stomp Manager uses), `iced`, or `slint` | |
+| GUI | [Tauri](https://tauri.app) with a web frontend (what Open Stomp Manager uses), `egui`/`eframe`, `iced`, or `slint` | |
 | Serialization (preset export) | `serde`, `serde_json` | |
 
 Find the port by name: match `"JME"` (the official app uses the regexes `.*JME.*` and `.*SORAN AMPEY.*`).
