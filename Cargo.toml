@@ -23,7 +23,7 @@ repository.workspace = true
 readme = "README.md"
 keywords = ["midi", "guitar", "pedal", "sysex", "soran"]
 categories = ["multimedia::audio", "hardware-support", "parser-implementations"]
-include = ["src/", "examples/", "tests/", "docs/", "captures/logs/", "README.md", "CHANGELOG.md"]
+include = ["src/", "examples/", "tests/", "docs/", "captures/logs/", "README.md", "CHANGELOG.md", "LICENSE-MIT", "LICENSE-APACHE"]
 
 [lib]
 name = "open_stomp"
@@ -57,12 +57,12 @@ name = "monitor"
 required-features = ["device"]
 
 [[example]]
-name = "ble_check"
-required-features = ["ble"]
-
-[[example]]
 name = "ports"
 required-features = ["device"]
+
+[[example]]
+name = "ble_check"
+required-features = ["ble"]
 
 [[example]]
 name = "nam_convert"
@@ -80,13 +80,13 @@ required-features = ["nam"]
 name = "nam_render"
 required-features = ["nam"]
 
-[package.metadata.docs.rs]
-all-features = true
+[[example]]
+name = "nam_level"
+required-features = ["nam"]
 
 [[example]]
 name = "ir_compare"
 required-features = ["nam"]
 
-[[example]]
-name = "nam_level"
-required-features = ["nam"]
+[package.metadata.docs.rs]
+all-features = true

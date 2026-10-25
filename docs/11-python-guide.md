@@ -24,7 +24,7 @@ has the background on each piece.
 pip install ./bindings/python        # from a checkout of this repo (builds with maturin)
 ```
 
-Needs Rust ≥ 1.88 and, on Linux, the ALSA headers (`libasound2-dev` / `alsa-lib-devel`). Release wheels are
+Needs Rust ≥ 1.88 and, on Linux, the ALSA and D-Bus headers (`libasound2-dev libdbus-1-dev` / `alsa-lib-devel dbus-devel`). Release wheels are
 attached to the [GitHub releases](https://github.com/JackMechem/open-stomp-lib/releases). Python ≥ 3.9.
 
 ## Modules

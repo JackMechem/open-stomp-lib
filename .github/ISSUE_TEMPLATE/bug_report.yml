@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in the library or the Python bindings doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Problems with the desktop app's window or controls belong in
+        [open-stomp-manager](https://github.com/JackMechem/open-stomp-manager/issues).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: A minimal code snippet or command, if you have one.
+      render: rust
+  - type: input
+    id: version
+    attributes:
+      label: open-stomp version
+      placeholder: "0.6.1, or a commit hash"
+    validations:
+      required: true
+  - type: dropdown
+    id: api
+    attributes:
+      label: Used from
+      options: [Rust, Python]
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 24.04, macOS 15, Windows 11, …"
+    validations:
+      required: true
+  - type: input
+    id: pedal
+    attributes:
+      label: Pedal and firmware
+      description: The firmware version is shown in the official app's settings, or by `cargo run --example monitor`.
+      placeholder: "Dual Stomp Lite, V1.1.1"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Error messages, or the relevant part of `cargo run --example monitor`.
+      render: text

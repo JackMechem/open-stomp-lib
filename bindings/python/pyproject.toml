@@ -19,7 +19,7 @@ dynamic = ["version"]
 
 [project.urls]
 Repository = "https://github.com/JackMechem/open-stomp-lib"
-Documentation = "https://github.com/JackMechem/open-stomp-lib/blob/main/docs/11-python-guide.md"
+Documentation = "https://jackmechem.github.io/open-stomp-lib/lib/11-python-guide.html"
 
 [project.optional-dependencies]
 test = ["pytest>=7"]

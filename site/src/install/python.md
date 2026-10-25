@@ -12,7 +12,7 @@ connection engine and NAM / IR conversion. Python ≥ 3.9.
 pip install open_stomp-0.6.1-*.whl
 ```
 
-**From source** (Rust ≥ 1.88; on Linux also the ALSA headers, `libasound2-dev` / `alsa-lib-devel`):
+**From source** (Rust ≥ 1.88; on Linux also the ALSA and D-Bus headers, `libasound2-dev libdbus-1-dev` / `alsa-lib-devel dbus-devel`):
 
 ```sh
 git clone https://github.com/JackMechem/open-stomp-lib

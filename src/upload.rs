@@ -10,7 +10,7 @@
 //!
 //! A user AMP upload is preceded by a 128-byte slot-info record (sub 3) carrying the name and a
 //! gain factor; a user IR upload is followed by a `0x09` name write. Converting a `.nam` or
-//! audio file into the 2048 floats is not reversed yet (docs/05, docs/09).
+//! audio file into the 2048 floats is done by the `nam` and `ir` modules (docs/05).
 
 use crate::midi::{Cmd, Dir, frame};
 use crate::pack::{pack, unpack};

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Problem with the desktop app
+    url: https://github.com/JackMechem/open-stomp-manager/issues
+    about: Bugs and ideas for Open Stomp Manager's window and controls go in its repository.
+  - name: Documentation
+    url: https://jackmechem.github.io/open-stomp-lib/
+    about: Guides for the app, the library and the protocol.

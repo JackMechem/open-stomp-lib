@@ -47,6 +47,20 @@ looper/drum/tuner records, NAM/IR uploads) goes over vendor SysEx `F0 00 21 7A 7
 read (0) / write (1) / reply (2) / ack (3), strictly request → response. Larger records are 8-bit structs packed into
 a 7-bit little-endian bitstream.
 
+### Cheat sheet
+
+| | |
+|---|---|
+| USB | `3962:2000`, class-compliant UAC2 + USB-MIDI, no vendor interface |
+| Channels | Pedal → host on channel 1, host → pedal on channel 2, same CC numbers both ways |
+| Head CCs | `(off ? 0x40 : 0) \| model`: OD/FX `0x00`, AMP `0x01`, CAB `0x02`, MOD `0x03`, DLY `0x04`, RVB `0x05`, GATE `0x06`, EQ `0x07` |
+| Parameter CCs | OD/FX `0x0C–0F`, GATE `0x08–09`, AMP `0x12–17`, CAB `0x1A–1E`, EQ `0x20–2B`, MOD `0x2C–2F`, DLY `0x30–33`, RVB `0x36–39`; VOL `0x3A`, page `0x3B` |
+| Presets | Program Change 0–98 = P01–P99 |
+| SysEx | `F0 00 21 7A 70 <cmd> <dir> … F7`; dir 0 read, 1 write, 2 reply, 3 ack; `7E` notify |
+| Commands | `09` IR slot, `0B` preset, `0C` edit buffer, `10` IR data, `12` name, `14` settings, `15` state, `18` looper, `19` drum, `58` user amp (NAM), `6F` tuner |
+| Packed records | 7-bit LSB-first bitstream (126 MIDI bytes ↔ 110 struct bytes for a preset) |
+| User IRs | The pedal plays only the first 384 taps (`ir::PEDAL_IR_TAPS`) |
+
 ## The official app (what we reversed)
 
 | | |

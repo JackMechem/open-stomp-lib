@@ -24,7 +24,7 @@ with Device() as dev:                 # finds and connects to the pedal by itsel
 
 ## Install
 
-From a checkout (needs Rust ≥ 1.88; on Linux also `libasound2-dev` / `alsa-lib-devel`):
+From a checkout (needs Rust ≥ 1.88; on Linux also `libasound2-dev libdbus-1-dev` / `alsa-lib-devel dbus-devel`):
 
 ```sh
 pip install ./bindings/python            # from the repository root

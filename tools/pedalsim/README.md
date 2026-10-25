@@ -29,7 +29,7 @@ Findings:
 | `optimize2.py` | optimiser over smooth minimum-phase curves (the one ported to Rust) |
 | `eval_feats.py`, `score_opt.py` | feature-metric score of simulated / recorded runs vs the real NAM |
 | `golden.py` | reference values for the Rust port's tests |
-| `readme_plots.py` | the frequency-response graphs in the README (`--cached` uses `results/`) |
+| `readme_plots.py` | the frequency-response graphs in `docs/images` (`--cached` uses `results/`) |
 
 ## Data
 
@@ -41,7 +41,7 @@ Not in git: the recordings (~200 MB), the official app's converter dumps (vendor
   open-stomp-manager checkout's `analysis/extracted/`.
 - `PEDALSIM_MODEL`: the `.nam` file.
 
-`results/svt_g10_responses.json` holds the measured 1/3-octave responses behind the README graphs, so those can be
+`results/svt_g10_responses.json` holds the measured 1/3-octave responses behind those graphs, so those can be
 redrawn without the recordings.
 
 ## Setup

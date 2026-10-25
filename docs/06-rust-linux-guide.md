@@ -211,11 +211,5 @@ To rename, also send `70 12 01 <slot> <16 ASCII bytes>` (see [03](03-sysex-proto
 
 ## 6. Roadmap
 
-Done in `open-stomp`: protocol, state tracking, request engine, live edits, preset save / rename, settings writes,
-capture replay. Done in Open Stomp Manager: the live editor GUI.
-
-1. CLI (`stompctl`): `info`, `presets list`, `preset get N --json`, `preset set N file.json`, `cc`, `monitor`
-   (the `monitor` example is a start).
-2. Backup/restore all 99 presets to a file (the format is yours to define).
-3. IR upload (after finishing the transform research in [05](05-uploads-nam-ir.md)).
-4. NAM conversion (hardest: needs the `imagelib` algorithm).
+The protocol, state tracking, live edits, saving, settings, capture replay and NAM/IR import are all done. What's
+left is under [Where help is wanted](../CONTRIBUTING.md#where-help-is-wanted) in the contributing guide.

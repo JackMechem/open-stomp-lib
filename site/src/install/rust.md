@@ -7,12 +7,12 @@
 open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.6.1" }
 ```
 
-Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers:
+Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers and `ble` the D-Bus headers:
 
 ```sh
-sudo apt install libasound2-dev      # Debian, Ubuntu
-sudo dnf install alsa-lib-devel      # Fedora
-nix develop                          # in a checkout: cargo, rust-analyzer, ALSA, amidi
+sudo apt install libasound2-dev libdbus-1-dev    # Debian, Ubuntu
+sudo dnf install alsa-lib-devel dbus-devel       # Fedora
+nix develop                                      # in a checkout: cargo, rust-analyzer, ALSA, amidi
 ```
 
 macOS and Windows need nothing extra.
@@ -22,6 +22,7 @@ macOS and Windows need nothing extra.
 | Feature | Default | What it adds |
 |---|---|---|
 | `device` | on | `open_stomp::device`, the connection engine (MIDI through midir: ALSA, CoreMIDI, WinMM) |
+| `ble` | on | Bluetooth LE MIDI: the engine also finds the pedal wirelessly (btleplug) |
 | `nam` | on | `open_stomp::nam`: run `.nam` models and convert them for the pedal; the optimised IR conversion |
 
 With `default-features = false` you get the protocol layer alone: parsing, building and state tracking, no I/O and

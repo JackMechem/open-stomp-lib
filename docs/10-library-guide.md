@@ -37,7 +37,7 @@ open-stomp = { path = "../open-stomp-lib", default-features = false }
 |---|---|---|
 | `device` | on | `open_stomp::device`: the engine thread (midir: ALSA on Linux, CoreMIDI on macOS, WinMM on Windows) |
 | `nam` | on | `open_stomp::nam`: run `.nam` models and convert them for the pedal (`serde_json`, `rustfft`) |
-| `ble` | off | The engine also finds the pedal over Bluetooth LE MIDI ([Bluetooth](#bluetooth); btleplug, tokio) |
+| `ble` | on | The engine also finds the pedal over Bluetooth LE MIDI ([Bluetooth](#bluetooth); btleplug, tokio) |
 
 Rust ≥ 1.88. On Linux the `device` feature needs the ALSA headers (`libasound2-dev` / `alsa-lib-devel`) and `ble`
 needs the D-Bus headers (`libdbus-1-dev` / `dbus-devel`) and BlueZ; macOS and Windows need nothing extra. The pedal is class compliant, so no driver is needed anywhere.

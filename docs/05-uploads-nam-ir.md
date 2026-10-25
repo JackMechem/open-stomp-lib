@@ -1,9 +1,9 @@
 # 05 — User AMP (NAM) and User IR uploads
 
-Status: **user AMP (NAM) import works end to end**: the transport (`open_stomp::upload`, rebuilt byte for byte from every
-captured import), NAM inference (`open_stomp::nam`, a port of NeuralAmpModelerCore) and the app's converter
-(`open_stomp::nam::convert`, [below](#our-implementation)). **User IR import**: transport done, the audio → 2048 floats
-conversion is not reversed yet.
+Status: **both imports work end to end** and are verified on hardware. The transport (`open_stomp::upload`) is
+rebuilt byte for byte from every captured import. NAM models run on a port of NeuralAmpModelerCore
+(`open_stomp::nam`) and convert with either the official app's algorithm ([below](#our-implementation)) or an
+[optimised conversion](#optimised-conversion). IRs convert the same two ways ([below](#user-ir--sysex-0x10-data--0x09-name)).
 
 ## Common chunk format
 
@@ -91,7 +91,7 @@ Test vectors (not in git; see `.gitignore`. Regenerate from the logs):
 | `FNDR BFSR VB Edge WRM2 CAB FREE.nam` | `NAM import 'FNDR` | `captures/files/FNDR.device_floats.bin` |
 | `Jcm800.nam` (from "Marshall Jcm800 + V30 1960.zip") | `deleted USER AMP NAM` (the next import after it) | `captures/files/Jcm800.device_floats.bin` |
 
-### The converter, run headless (2026-10)
+### The converter, run headless
 
 The app's converter can be run outside the app: `tools/namconv/` in the
 [open-stomp-manager](https://github.com/JackMechem/open-stomp-manager) repo (`nam-re` branch) loads
@@ -169,7 +169,7 @@ Two quirks are part of what the pedal gets, and the open converter copies both:
   `G1IR`/`G2IR` miss jagged target curves by up to ~1–3 dB per bin (`G1IR` vs `g1GainsDb`: mean 0.01–0.13 dB, std
   0.5–1.1 dB in the app's own output).
 
-### What the pedal runs: 512 taps per filter (2026-10)
+### What the pedal runs: 512 taps per filter
 
 Re-amping (a test signal through the pedal and through the real model, see `tools/pedalsim`)
 shows that the pedal runs only the **first 512 taps** of each uploaded impulse response: `data[512..1024]` for G1 and
@@ -343,7 +343,7 @@ sub-command is 0. The `0x09` record is a 4-byte field (`01 00 00 00` in every im
 name: the file name without its extension, **cut to 16 characters**. Checked byte for byte against imports into all ten
 slots (`captures/logs/02-ir-tests.log`, `tests/ir_import.rs`).
 
-### What the 2048 floats are (the official converter, 2026-10)
+### What the 2048 floats are (the official converter)
 
 Recovered from the app's native code (`nux_plugins`: `JuceUtil::convertAudioToWaveFormat`, decompiled with Ghidra)
 and confirmed on eleven captured imports: ten designed test IRs (`tests/data/ir`, `examples/ir_test_files`) and a
@@ -364,7 +364,7 @@ real reverb IR. `ir::convert` reproduces all of them (eight bit for bit, the res
 
 `convertAudioToWavWithOut` writes 2048 floats back out reversed as a 24-bit WAV (an export, not part of the import).
 
-### What the pedal plays: 384 of the 2048 IR samples (2026-10)
+### What the pedal plays: 384 of the 2048 IR samples
 
 Re-amping probe IRs (impulses at known taps, uploaded to USER IR 10, the CAB block on its own, sweep deconvolution
 divided by the dry path; `tools/pedalsim/ir_reamp_*.py`) shows that the pedal plays only the **first 384 taps (8 ms)**

@@ -11,7 +11,7 @@ Open tools for the **SORAN Dual Stomp Lite** guitar multi-effects pedal (USB `39
 * **[The protocol](lib/01-overview.md)**, documented in full, and [how it was recovered](lib/07-capture-methodology.md).
 
 <div class="feature">
-<p class="feature-tag">New in 0.5</p>
+<p class="feature-tag">Since 0.5</p>
 <h2 class="feature-title">NAM imports that sound like the model, low end included</h2>
 <p>A bass DI re-amped through the pedal with four conversions of the same amp model, against the original model and
 cab IR in software. open-stomp 0.5 is the closest of the four in 87% of the recording.</p>
@@ -47,6 +47,10 @@ cab IR in software. open-stomp 0.5 is the closest of the four in 87% of the reco
 
 * Library and these docs: [github.com/JackMechem/open-stomp-lib](https://github.com/JackMechem/open-stomp-lib)
 * App: [github.com/JackMechem/open-stomp-manager](https://github.com/JackMechem/open-stomp-manager)
+
+Both are open source (MIT OR Apache-2.0) and welcome contributions: see the contributing guides for the
+[library](https://github.com/JackMechem/open-stomp-lib/blob/main/CONTRIBUTING.md) and the
+[app](https://github.com/JackMechem/open-stomp-manager/blob/main/CONTRIBUTING.md).
 
 ## Legal
 

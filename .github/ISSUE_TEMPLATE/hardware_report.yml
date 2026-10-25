@@ -1,0 +1,45 @@
+name: Hardware report
+description: Tried open-stomp with a pedal or firmware we haven't tested? Tell us how it went
+labels: [hardware]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Only the Dual Stomp Lite on firmware V1.1.1 has been tested so far. Reports from other pedals and firmware
+        versions help everyone, whether things worked or not.
+  - type: input
+    id: pedal
+    attributes:
+      label: Pedal
+      placeholder: "Dual Stomp, Tiny Stomp, …"
+    validations:
+      required: true
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware version
+      placeholder: "V1.1.1"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and connection
+      placeholder: "Fedora 41, USB"
+  - type: checkboxes
+    id: works
+    attributes:
+      label: What worked?
+      options:
+        - label: Connecting and the startup sync
+        - label: Live edits (presets, models, knobs)
+        - label: Saving a preset
+        - label: Changing system settings
+        - label: NAM import
+        - label: IR import
+        - label: Bluetooth
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything that didn't work, looked wrong, or differed from the official app. Logs are welcome.
