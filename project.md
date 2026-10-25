@@ -27,6 +27,8 @@ reverse-engineering workbench (sniffer, decoders, static-analysis artefacts) als
 ## Key facts (cheat sheet)
 
 * USB `3962:2000`, class-compliant UAC2 + USB-MIDI. No vendor interface.
+* Bluetooth (Wireless on): BLE-MIDI as "JME STOMPBOX", same messages as USB. Pace ≥ 15 ms (unpaced bursts freeze
+  the pedal); replies take ~95 ms, so the startup sync takes ~19 s.
 * Pedal → host: ch 1. Host → pedal: ch 2. Same CC numbers both ways.
 * Head CC per module = `(off?0x40:0) | model`: OD/FX `0x00`, AMP `0x01`, CAB `0x02`, MOD `0x03`, DLY `0x04`,
   RVB `0x05`, GATE `0x06`, EQ `0x07`. Params: OD/FX `0x0C–0F`, GATE `0x08–09`, AMP `0x12–17`, CAB `0x1A–1E`,
@@ -50,8 +52,11 @@ reverse-engineering workbench (sniffer, decoders, static-analysis artefacts) als
 - [x] NAM → device conversion: official algorithm recovered, plus an optimised conversion (verified on hardware)
 - [x] IR → device conversion: official algorithm recovered (byte-exact vs eleven captured imports), plus an
       optimised 384-tap conversion (verified on hardware)
-- [ ] Open questions that matter for v1 ([docs/09](docs/09-open-questions.md) #4–#6): #5 mostly confirmed on
-      Linux (host `0x40`/`0x42`/`0x43`); `0x4A`, tuner control, #4 and #6 still open
+- [x] Bluetooth LE MIDI transport (0.6.0, feature `ble`, on by default): verified on hardware, NAM/IR imports
+      included (`examples/ble_check.rs`)
+- [x] Release channels: `stable` / `unstable` branches moved by `channels.yml`; pre-releases are `vX.Y.Z-beta.N`
+- [ ] Open questions that matter for v1 ([docs/09](docs/09-open-questions.md) #1–#3): preset unknown bytes (#1),
+      host CCs `0x4A` and tuner control (#2; `0x40`/`0x42`/`0x43` confirmed), edit-buffer write (#3)
 - [ ] Run preset/settings *writes* on hardware (byte-exact vs the capture, not yet run from this code)
 - [ ] LSTM / ConvNet NAM models
 - [ ] `stompctl` CLI (info, monitor, preset get/set/backup; see [docs/06](docs/06-rust-linux-guide.md))
