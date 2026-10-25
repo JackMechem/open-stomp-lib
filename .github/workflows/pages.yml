@@ -2,12 +2,15 @@ name: Docs site
 
 # Builds the documentation site (site/, mdBook) from this repository's docs and Open Stomp Manager's, adds the
 # rustdoc API reference under /api, and publishes it to GitHub Pages. Needs Settings → Pages → Source:
-# "GitHub Actions". Run it by hand (Actions → Docs site → Run workflow) after changing the manager's docs.
+# "GitHub Actions". Open Stomp Manager starts it when its docs change (its docs.yml, through workflow_dispatch),
+# and it runs daily as a backstop.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * *"
 
 permissions:
   contents: read
