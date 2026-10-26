@@ -7,7 +7,7 @@ name: TestPyPI dry run
 #
 # Register a SEPARATE pending publisher on test.pypi.org: owner JackMechem, repo open-stomp-lib,
 # workflow testpypi.yml, environment testpypi. Install from it with:
-#   pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ open-stomp
+#   pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ open-stomp-lib
 on:
   workflow_dispatch:
 
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/open-stomp
+      url: https://test.pypi.org/p/open-stomp-lib
     permissions:
       id-token: write
     steps:

@@ -3,7 +3,7 @@ requires = ["maturin>=1.9,<2"]
 build-backend = "maturin"
 
 [project]
-name = "open-stomp"
+name = "open-stomp-lib"
 description = "Talk to the SORAN Dual Stomp guitar pedal over USB-MIDI: protocol, state tracking and a connection engine (Rust, via PyO3)"
 readme = "README.md"
 requires-python = ">=3.9"
