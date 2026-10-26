@@ -1,0 +1,67 @@
+name: TestPyPI dry run
+
+# A manual dry run of the PyPI publish path: build the sdist + a Linux wheel from the current ref
+# and upload them to TestPyPI via Trusted Publishing. It never creates a GitHub release or moves the
+# channel branches, so it can't cut a real release. `skip-existing` lets you re-run it without
+# bumping the version. Run it from Actions → "TestPyPI dry run" → Run workflow.
+#
+# Register a SEPARATE pending publisher on test.pypi.org: owner JackMechem, repo open-stomp-lib,
+# workflow testpypi.yml, environment testpypi. Install from it with:
+#   pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ open-stomp
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: bindings/python
+          target: x86_64
+          args: --release --out dist
+          manylinux: "2_28"
+          # midir links ALSA on Linux, btleplug (Bluetooth) links D-Bus
+          before-script-linux: dnf install -y alsa-lib-devel dbus-devel
+      - name: Sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: bindings/python
+          command: sdist
+          args: --out dist
+      - name: Smoke test the wheel
+        run: |
+          pip install bindings/python/dist/*.whl
+          python -c "import open_stomp; print(open_stomp.__version__, open_stomp.Module.AMP.models[8])"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: testpypi-dist
+          path: bindings/python/dist/*
+
+  publish:
+    name: publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/open-stomp
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: testpypi-dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist
+          skip-existing: true

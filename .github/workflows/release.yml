@@ -1,9 +1,10 @@
 name: Release
 
-# Push a tag `vX.Y.Z` matching Cargo.toml to test it and publish a GitHub release with the
-# CHANGELOG.md section as notes and the Python wheels attached. Dependents pin the tag (git
-# dependency or sibling checkout). A tag with a pre-release suffix (vX.Y.Z-beta.N) is published as a
-# pre-release. channels.yml then moves the stable / unstable branches.
+# Push a tag `vX.Y.Z` matching Cargo.toml to test it, publish a GitHub release with the CHANGELOG.md
+# section as notes and the Python wheels attached, and upload the wheels + sdist to PyPI (via
+# Trusted Publishing — the `publish` job, gated on the `pypi` environment). Dependents pin the tag
+# (git dependency or sibling checkout). A tag with a pre-release suffix (vX.Y.Z-beta.N) is published
+# as a pre-release. channels.yml then moves the stable / unstable branches.
 on:
   push:
     tags: ["v*"]
@@ -76,6 +77,10 @@ jobs:
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: bindings/python/dist/*.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.name }}
+          path: bindings/python/dist/*.whl
 
   sdist:
     needs: release
@@ -91,3 +96,30 @@ jobs:
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: bindings/python/dist/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-sdist
+          path: bindings/python/dist/*.tar.gz
+
+  # Publish the built wheels + sdist to PyPI via Trusted Publishing (OIDC — no API token). The
+  # `pypi` environment lets you require a manual approval before each upload (repo Settings →
+  # Environments → pypi). Register the publisher on PyPI with: owner JackMechem, repo
+  # open-stomp-lib, workflow release.yml, environment pypi.
+  publish:
+    name: publish to PyPI
+    needs: [wheels, sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/open-stomp
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
