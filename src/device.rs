@@ -393,6 +393,25 @@ impl Device {
         Ok(converted)
     }
 
+    /// Ask the pedal for user AMP `slot`'s model data (0–9). The 61 replies arrive as
+    /// [`Update::Message`]s (`0x58`, `dir` 2); collect them with an [`upload::Reassembler`].
+    pub fn read_user_amp(&self, slot: u8) -> Result<(), UploadError> {
+        if slot >= upload::USER_SLOTS {
+            return Err(UploadError::Slot(slot));
+        }
+        self.write(upload::user_amp_read(slot));
+        Ok(())
+    }
+
+    /// Ask for user IR `slot`'s data, like [`Device::read_user_amp`] (replies are `0x10`, `dir` 2).
+    pub fn read_user_ir(&self, slot: u8) -> Result<(), UploadError> {
+        if slot >= upload::USER_SLOTS {
+            return Err(UploadError::Slot(slot));
+        }
+        self.write(upload::user_ir_read(slot));
+        Ok(())
+    }
+
     /// Write the global settings (read-modify-write: start from the pedal's current record).
     pub fn write_settings(&self, settings: &Settings) {
         self.write(vec![host::settings_write(settings)]);

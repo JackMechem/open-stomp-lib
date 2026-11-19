@@ -57,7 +57,8 @@ reverse-engineering workbench (sniffer, decoders, static-analysis artefacts) als
 - [x] Release channels: `stable` / `unstable` branches moved by `channels.yml`; pre-releases are `vX.Y.Z-beta.N`
 - [ ] Open questions that matter for v1 ([docs/09](docs/09-open-questions.md) #1–#3): preset unknown bytes (#1),
       host CCs `0x4A` and tuner control (#2; `0x40`/`0x42`/`0x43` confirmed), edit-buffer write (#3)
-- [ ] Run preset/settings *writes* on hardware (byte-exact vs the capture, not yet run from this code)
+- [x] Run preset *writes* on hardware (2026-11-19, through the manager's preset import; docs/09 #4)
+- [ ] Run settings *writes* on hardware (byte-exact vs the capture, not yet run from this code)
 - [ ] LSTM / ConvNet NAM models
 - [ ] `stompctl` CLI (info, monitor, preset get/set/backup; see [docs/06](docs/06-rust-linux-guide.md))
 

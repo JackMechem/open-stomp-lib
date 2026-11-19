@@ -556,7 +556,7 @@ impl DeviceState {
                     if let Some(s) = self.user_amps.get_mut(info.slot as usize) {
                         *s = Some(info.name);
                     }
-                } else if let Some(c) = chunk.filter(|c| c.sub == amp_sub::DELETE) {
+                } else if let Some(c) = chunk.as_ref().filter(|c| c.sub == amp_sub::DELETE) {
                     ev.category = Category::Effect(Module::Amp);
                     ev.subject = "User AMP deleted".into();
                     ev.value = format!("USER AMP {:02}", c.slot + 1);
@@ -564,12 +564,29 @@ impl DeviceState {
                     ev.subject = format!("{} upload", Cmd::label(cmd));
                     ev.value = upload_progress(payload);
                     ev.coalesce = key(&[ev.origin as u64, 11, cmd as u64]);
+                } else if chunk.is_some_and(|c| c.sub == amp_sub::READ_DATA) {
+                    ev.subject = format!("{} read", Cmd::label(cmd));
+                    ev.value = upload_progress(payload);
+                    ev.coalesce = key(&[ev.origin as u64, 12, cmd as u64]);
+                }
+            }
+            Some(Cmd::UserAmp) if dir == Dir::Read as u8 => {
+                if crate::upload::Chunk::parse(payload).is_some_and(|c| c.sub == crate::upload::amp_sub::READ_DATA) {
+                    ev.subject = format!("{} read", Cmd::label(cmd));
+                    ev.value = upload_progress(payload);
+                    ev.coalesce = key(&[ev.origin as u64, 12, cmd as u64]);
                 }
             }
             Some(Cmd::IrData) if host_write => {
                 ev.subject = format!("{} upload", Cmd::label(cmd));
                 ev.value = upload_progress(payload);
                 ev.coalesce = key(&[ev.origin as u64, 11, cmd as u64]);
+            }
+            // reading a slot back (requests and replies)
+            Some(Cmd::IrData) => {
+                ev.subject = format!("{} read", Cmd::label(cmd));
+                ev.value = upload_progress(payload);
+                ev.coalesce = key(&[ev.origin as u64, 12, cmd as u64]);
             }
             Some(Cmd::Loop) if data => {
                 if payload.len() >= 4 {

@@ -63,6 +63,8 @@ pub fn check(slot: u8, data: &[f32]) -> Result<(), UploadError> {
 
 /// `0x58` sub-commands (unpacked header byte 2).
 pub mod amp_sub {
+    /// With `dir` 0 (read): one chunk of the slot's model data comes back (docs/05).
+    pub const READ_DATA: u8 = 0;
     pub const DATA: u8 = 1;
     pub const WRITE_INFO: u8 = 3;
     pub const READ_INFO: u8 = 4;
@@ -255,6 +257,31 @@ pub fn user_amp_upload(info: &UserAmpInfo, data: &[f32]) -> Vec<Vec<u8>> {
     v
 }
 
+/// Header-only read requests for a slot's 8192 bytes of model data, one per 136-byte chunk.
+fn read_frames(cmd: Cmd, slot: u8, sub: u8) -> Vec<Vec<u8>> {
+    let total = (UPLOAD_FLOATS * 4) as u32;
+    let (ir_slot, slot) = if cmd == Cmd::IrData { (slot, 0) } else { (0, slot) };
+    (0..total)
+        .step_by(CHUNK_BYTES)
+        .map(|offset| {
+            let c = Chunk { ir_slot, slot, sub, offset, total, data: vec![] };
+            frame(cmd, Dir::Read, &c.to_packed())
+        })
+        .collect()
+}
+
+/// Read user AMP `slot`'s 2048 floats back from the pedal: 61 requests, each answered by a `dir` 2
+/// reply carrying that chunk (the upload's layout). Feed the replies to a [`Reassembler`]. Not
+/// used by the official app; found by probing (docs/05).
+pub fn user_amp_read(slot: u8) -> Vec<Vec<u8>> {
+    read_frames(Cmd::UserAmp, slot, amp_sub::READ_DATA)
+}
+
+/// Read user IR `slot`'s 2048 floats back, like [`user_amp_read`] (the slot in header byte 0).
+pub fn user_ir_read(slot: u8) -> Vec<Vec<u8>> {
+    read_frames(Cmd::IrData, slot, IR_DATA_SUB)
+}
+
 /// Delete a user AMP slot (the app re-reads its info afterwards).
 pub fn user_amp_delete(slot: u8) -> Vec<u8> {
     let c = Chunk { ir_slot: 0, slot, sub: amp_sub::DELETE, offset: 0, total: 0, data: vec![] };
@@ -287,6 +314,29 @@ pub fn user_ir_upload(slot: u8, name: &str, data: &[f32]) -> Vec<Vec<u8>> {
 mod tests {
     use super::*;
     use crate::midi::{Msg, hex};
+
+    #[test]
+    fn read_requests() {
+        let amp = user_amp_read(9);
+        assert_eq!(amp.len(), 61);
+        // byte for byte what was sent to the pedal (2026-11-19) for the first chunk of USER AMP 10
+        assert_eq!(hex(&amp[0]), "F0 00 21 7A 70 58 00 00 12 00 00 00 00 00 00 00 00 00 01 00 00 F7");
+        let Msg::Nep { cmd: 0x58, dir: 0, payload } = Msg::parse(&amp[60]) else { panic!() };
+        let c = Chunk::parse(&payload).unwrap();
+        assert_eq!((c.slot, c.sub, c.offset, c.total, c.data.len()), (9, 0, 8160, 8192, 0));
+        let ir = user_ir_read(9);
+        assert_eq!(hex(&ir[0]), "F0 00 21 7A 70 10 00 09 00 00 00 00 00 00 00 00 00 00 01 00 00 F7");
+
+        // the replies carry the data at the requested offsets, like an upload
+        let data: Vec<f32> = (0..UPLOAD_FLOATS).map(|i| i as f32 * 0.25).collect();
+        let mut r = Reassembler::default();
+        let mut out = None;
+        for f in data_frames(Cmd::IrData, 9, IR_DATA_SUB, &floats_to_bytes(&data)) {
+            let Msg::Nep { payload, .. } = Msg::parse(&f) else { panic!() };
+            out = r.push(&Chunk::parse(&payload).unwrap());
+        }
+        assert_eq!(out, Some((9, data)));
+    }
 
     #[test]
     fn chunking() {

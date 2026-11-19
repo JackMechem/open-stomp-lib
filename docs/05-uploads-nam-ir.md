@@ -330,6 +330,25 @@ alone. Tested on 2026-10-22 on USER AMP 10 and USER IR 10: a sweep through each 
 rename, differs by at most 0.09 dB (rig noise), and the new names read back after reconnecting. Then all twenty slots
 were renamed the same way. `Device::rename_user_amp` / `rename_user_ir` send the record and re-read the slot.
 
+### Reading a slot back
+
+The pedal sends a user slot's data back, though the official app never asks for it (it has no export). Found by
+probing on 2026-11-19 (firmware V1.1.1, USB). A **read** (`dir` 0) with the usual header and **no data** returns the
+chunk at that offset, in a `dir` 2 reply laid out exactly like an upload chunk (header + up to 136 bytes):
+
+```
+→ 70 58 00 <packed: 00 <slot> 00 00 | offset | total 8192>       ← 70 58 02 <packed: 00 <slot> 00 00 | offset | 8192 | 136 bytes>
+→ 70 10 00 <packed: <slot> 00 00 00 | offset | total 8192>       ← 70 10 02 <packed: <slot> 00 00 00 | offset | 8192 | 136 bytes>
+```
+
+NAM uses sub-command **0** (sub 2 answers with the slot-info record, like sub 4); IR data has the slot in header byte 0
+as in uploads. Reading all 61 chunks of USER AMP 10 and USER IR 10 gave back exactly the floats uploaded there, byte for
+byte, in about 60 ms per slot. With the AMP slot-info record (sub 4, for the factor) that is everything an import
+writes, so a slot can be backed up and restored exactly (not the `.nam` file, which never reaches the pedal).
+`upload::user_amp_read` / `user_ir_read` build the requests, `Device::read_user_amp` / `read_user_ir` queue them, and a
+`Reassembler` collects the replies. Only reads were sent while probing (`dir` 0, subs 0, 1, 2 and 4); a bare
+`70 10 00 <slot>` answers with a header whose byte 0 has bit 7 set and `FF` data, and isn't used.
+
 ## User IR — SysEx `0x10` (data) + `0x09` (name)
 
 ```

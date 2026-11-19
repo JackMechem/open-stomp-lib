@@ -11,8 +11,11 @@ If you find an answer, please open an issue or a pull request that updates this 
 2. **Host→pedal CCs not yet captured**: loop mode `0x4A` and tuner control. (Drum pattern `0x40` and loop levels
    `0x42`/`0x43` are confirmed, see [02](02-midi-cc-reference.md).)
 3. **Writing the edit buffer** (`0x0C` dir 1): does it exist? The app only uses live CCs and the `0x0B` save.
-4. **Preset and settings writes on hardware**: the library's writes match the official app byte for byte, but
-   haven't been run on a pedal from this code yet.
+4. **Settings writes on hardware**: the library's writes match the official app byte for byte, and an unchanged
+   rewrite is acked (`examples/ble_check.rs`), but writing changed values hasn't been checked on a pedal from this code.
+   Preset writes have (2026-11-19, Open Stomp Manager's preset import over USB): `program(i)` then
+   `host::save_preset(i, p)` stores the record byte for byte (read back identical apart from the index byte when
+   copying to another slot), each write acked.
 5. **IR slot 4-byte field** (`0x09` record bytes 0–3): `01 00 00 00` in all eleven captured imports (ten slots,
    different files and names), so probably a constant or a "slot in use" flag.
 
@@ -39,6 +42,8 @@ If you find an answer, please open an issue or a pull request that updates this 
 
 ## Resolved
 
+- **Reading user slots back** (2026-11-19): `0x58` sub 0 and `0x10` reads (`dir` 0) return the slot's data one chunk
+  at a time, byte for byte what was uploaded ([05](05-uploads-nam-ir.md#reading-a-slot-back)).
 - **NAM → device conversion**: recovered and implemented (`open_stomp::nam`, [05](05-uploads-nam-ir.md#our-implementation)).
   An Ampeg SVT model converted by the official algorithm and by ours sounds identical on the pedal.
 - **IR transform**: resampled first channel, first 2048 samples reversed, gain centring the 398 Hz–3 kHz response on

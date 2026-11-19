@@ -71,7 +71,7 @@ Seen:
 | `0x0B` | Preset (by index) | `70 0B 00 <idx> 00*13` | `70 0B 01 <packed 126 B>` | packed (whole body) | confirmed |
 | `0x0C` | Current / edit-buffer preset | `70 0C 00 00*14` | ? | packed, same layout as `0x0B` (index field 0) | read confirmed |
 | `0x0D` | Module link / chain *(static)* | | | | not seen |
-| `0x10` | **User IR upload** (data chunks) | | `70 10 01 <packed chunk>` | packed | confirmed |
+| `0x10` | **User IR data** (upload chunks; read back) | `70 10 00 <packed hdr>` (one chunk per request) | `70 10 01 <packed chunk>` | packed | confirmed |
 | `0x12` | Preset name | | `70 12 01 <slot?> <16 B ASCII>` | **plain** ASCII | confirmed |
 | `0x14` | System settings | `70 14 00` | `70 14 01 <packed 20 B>` | packed | confirmed |
 | `0x15` | Current state | `70 15 00` | ? | plain | read confirmed |
@@ -79,7 +79,7 @@ Seen:
 | `0x18` | Looper settings/state | `70 18 00` | `70 18 01 <5 B>` | plain | confirmed |
 | `0x19` | Drum | `70 19 00` | ? | plain | read confirmed |
 | `0x1B` | Bluetooth params *(static)* | | | | not seen |
-| `0x58` | **User AMP (NAM) slot**: info, data, delete | `70 58 00 <packed hdr>` | `70 58 01 <packed>` | packed | confirmed |
+| `0x58` | **User AMP (NAM) slot**: info, data (also read back, sub 0), delete | `70 58 00 <packed hdr>` | `70 58 01 <packed>` | packed | confirmed |
 | `0x6F` | Tuner | `70 6F 00` | `70 6F 01 <5 B>` | plain | confirmed |
 
 Write acks are short: `70 <cmd> 03` + a few bytes (often zeros, sometimes an echo of the request header).
