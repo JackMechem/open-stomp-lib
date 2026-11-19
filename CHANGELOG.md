@@ -6,6 +6,8 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-19
+
 ### Added
 - Read a user AMP (NAM) or IR slot's model data back from the pedal: `upload::user_amp_read` / `user_ir_read`,
   `Device::read_user_amp` / `read_user_ir` (replies collect with `upload::Reassembler`). The official app never does
@@ -201,7 +203,8 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.0...v0.5.1
