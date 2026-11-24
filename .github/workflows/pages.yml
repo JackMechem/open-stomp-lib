@@ -2,15 +2,16 @@ name: Docs site
 
 # Builds the documentation site (site/, mdBook) from this repository's docs and Open Stomp Manager's, adds the
 # rustdoc API reference under /api, and publishes it to GitHub Pages. Needs Settings → Pages → Source:
-# "GitHub Actions". Open Stomp Manager starts it when its docs change (its docs.yml, through workflow_dispatch),
-# and it runs daily as a backstop.
+# "GitHub Actions". It builds on every push to main here, and every 30 minutes it checks Open Stomp Manager: when that
+# repository's main branch or release tags differ from the ones the live site was built from (manager.ref on the
+# site), it rebuilds. Both repositories are public, so the check needs no token.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
   schedule:
-    - cron: "17 6 * * *"
+    - cron: "*/30 * * * *"
 
 permissions:
   contents: read
@@ -26,7 +27,26 @@ env:
   MDBOOK_VERSION: v0.5.4
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+      ref: ${{ steps.check.outputs.ref }}
+    steps:
+      - id: check
+        run: |
+          ref=$(git ls-remote https://github.com/JackMechem/open-stomp-manager HEAD 'refs/tags/v*' | sha256sum | cut -c1-16)
+          live=$(curl -fsS https://jackmechem.github.io/open-stomp-lib/manager.ref || true)
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" != schedule || "$ref" != "$live" ]]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Open Stomp Manager unchanged since the last build ($ref)"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
       # full history and tags, so site/assemble.py can tell whether main is past the last release
@@ -56,6 +76,8 @@ jobs:
         run: |
           cargo doc --no-deps -p open-stomp
           cp -r target/doc site/book/api
+      - name: Record which Open Stomp Manager state this is
+        run: echo "${{ needs.check.outputs.ref }}" > site/book/manager.ref
       - uses: actions/upload-pages-artifact@v4
         with:
           path: site/book
