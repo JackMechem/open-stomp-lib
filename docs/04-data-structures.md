@@ -130,6 +130,7 @@ The notification form is `70 7E 02 19 02 <same 6 bytes>`.
 
 ## Tuner — SysEx `0x6F` (plain)
 
-Payload: `<status> 00 0A 00 00`. status 1 = tuner active, 0 = off. `0x0A` is probably the A4 reference
+Payload: `<status> 00 0A 00 00`. status 1 = tuner active, 0 = off. Writing it (`dir` 1) with status 1 or 0 switches
+the tuner on or off; the pedal acks and sends its `0x6F` notification (confirmed 2026-11-24, v1.1.1 over USB). `0x0A` is probably the A4 reference
 (maybe 430 + 10 = 440 Hz, *guess*). Static field names: status, mode, pitch, mute. Live pitch data comes as CCs
 `0x45`/`0x46`/`0x48`.

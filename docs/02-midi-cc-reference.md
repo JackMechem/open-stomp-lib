@@ -201,7 +201,7 @@ Raw 50 = slider centre (presumably 0 dB; the dB scaling is *unverified*).
 | `0x44` | pedal→host | Looper **state** | see below |
 | `0x44` | host→pedal | Looper **button command** | see below |
 | `0x45` | pedal→host | Tuner: note detected | 1 detected, 0 released |
-| `0x46` | pedal→host | Tuner: pitch class | 0–11, C=0 |
+| `0x46` | pedal→host | Tuner: pitch class | 0–11, **A=0** (A, A#, B, C, …); confirmed on a bass: G sends 10, E sends 7 |
 | `0x48` | pedal→host | Tuner: cents | 0x32 (50) = in tune, lower = flat, higher = sharp (~1 unit/cent, *unverified*) |
 | `0x49` | both | Looper LOOP SYNC | 0 Off, 1 On |
 | `0x4A` | pedal→host | Looper LOOP MODE | 0 NR, 1 AR |

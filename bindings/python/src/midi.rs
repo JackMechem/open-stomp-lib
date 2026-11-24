@@ -240,6 +240,12 @@ fn looper_button<'py>(py: Python<'py>, button: u8) -> Bound<'py, PyBytes> {
 }
 
 #[pyfunction]
+#[pyo3(name = "tuner")]
+fn host_tuner<'py>(py: Python<'py>, on: bool) -> Bound<'py, PyBytes> {
+    bytes(py, &h::tuner(on))
+}
+
+#[pyfunction]
 fn preset_name<'py>(py: Python<'py>, source_slot: u8, name: &str) -> Bound<'py, PyBytes> {
     bytes(py, &h::preset_name(source_slot, name))
 }
@@ -317,6 +323,7 @@ pub fn register(py: Python<'_>, md: &Bound<'_, PyModule>) -> PyResult<()> {
         wrap_pyfunction!(volume, &host)?,
         wrap_pyfunction!(page, &host)?,
         wrap_pyfunction!(looper_button, &host)?,
+        wrap_pyfunction!(host_tuner, &host)?,
         wrap_pyfunction!(preset_name, &host)?,
         wrap_pyfunction!(preset_write, &host)?,
         wrap_pyfunction!(save_preset, &host)?,

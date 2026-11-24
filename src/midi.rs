@@ -197,6 +197,12 @@ pub mod host {
         cc(0x44, b)
     }
 
+    /// Switch the tuner on or off. Same payload the official app writes back after the pedal's
+    /// tuner notification; `0x0A` is the reference byte every read has returned.
+    pub fn tuner(on: bool) -> Vec<u8> {
+        frame(Cmd::Tuner, Dir::Write, &[on as u8, 0, 0x0A, 0, 0])
+    }
+
     /// Set the edit buffer's name. The official app sends the slot being edited first
     /// (the active preset, even when saving to another slot).
     pub fn preset_name(source_slot: u8, name: &str) -> Vec<u8> {
@@ -332,6 +338,13 @@ mod tests {
             Msg::parse(&req::settings()),
             Msg::Nep { cmd: 0x14, dir: 0, payload: vec![] }
         );
+    }
+
+    #[test]
+    fn tuner_write_matches_official_app() {
+        // From the capture: the app's write-back after the pedal's tuner notification.
+        assert_eq!(host::tuner(true), [0xF0, 0, 0x21, 0x7A, 0x70, 0x6F, 1, 1, 0, 0x0A, 0, 0, 0xF7]);
+        assert_eq!(host::tuner(false), [0xF0, 0, 0x21, 0x7A, 0x70, 0x6F, 1, 0, 0, 0x0A, 0, 0, 0xF7]);
     }
 
     #[test]

@@ -8,8 +8,8 @@ If you find an answer, please open an issue or a pull request that updates this 
 
 1. **Preset unknown bytes**: offset 8 (`0x62`), 79–81, 82 (`6`), 90–93. Toggle things in the app that aren't
    covered yet (chain reordering, tempo/BPM per preset, scenes if any) and diff `0x0C` reads.
-2. **Host→pedal CCs not yet captured**: loop mode `0x4A` and tuner control. (Drum pattern `0x40` and loop levels
-   `0x42`/`0x43` are confirmed, see [02](02-midi-cc-reference.md).)
+2. **Host→pedal CCs not yet captured**: loop mode `0x4A`. (Drum pattern `0x40` and loop levels `0x42`/`0x43` are
+   confirmed, see [02](02-midi-cc-reference.md); tuner control is resolved below.)
 3. **Writing the edit buffer** (`0x0C` dir 1): does it exist? The app only uses live CCs and the `0x0B` save.
 4. **Settings writes on hardware**: the library's writes match the official app byte for byte, and an unchanged
    rewrite is acked (`examples/ble_check.rs`), but writing changed values hasn't been checked on a pedal from this code.
@@ -41,6 +41,9 @@ If you find an answer, please open an issue or a pull request that updates this 
 15. **The legacy "Syx/Cherub" header** `43 58 70 7E` seen in static analysis: never observed from this pedal.
 
 ## Resolved
+
+- **Tuner control** (2026-11-24): writing `0x6F` with status 1/0 switches the tuner on/off
+  ([04](04-data-structures.md#tuner--sysex-0x6f-plain)). The tuner's pitch class CC `0x46` counts from A, not C.
 
 - **Reading user slots back** (2026-11-19): `0x58` sub 0 and `0x10` reads (`dir` 0) return the slot's data one chunk
   at a time, byte for byte what was uploaded ([05](05-uploads-nam-ir.md#reading-a-slot-back)).
