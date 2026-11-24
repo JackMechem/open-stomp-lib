@@ -6,6 +6,8 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-24
+
 ### Added
 - Switch the tuner on and off from the host: `host::tuner(on)` / `Device::set_tuner(on)` (Python:
   `midi.host.tuner`, `Device.set_tuner`). Confirmed on a pedal (v1.1.1, USB): the pedal acks, enters or
@@ -212,7 +214,8 @@ app's `device` module.
   end to end through replay, on top of the existing capture-driven tests.
 - Documentation: the full protocol docs (01–09) and a library guide (10).
 
-[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/JackMechem/open-stomp-lib/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/JackMechem/open-stomp-lib/compare/v0.5.1...v0.6.0

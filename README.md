@@ -7,7 +7,7 @@
 [![Docs](https://img.shields.io/badge/docs-site-blue)](https://jackmechem.github.io/open-stomp-lib/)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
 
-Version **0.6.2** · Rust and Python · Linux, macOS, Windows ·
+Version **0.6.3** · Rust and Python · Linux, macOS, Windows ·
 [Documentation](https://jackmechem.github.io/open-stomp-lib/) · [Changelog](CHANGELOG.md)
 
 `open-stomp` speaks the pedal's USB-MIDI and Bluetooth MIDI protocol, which was reverse engineered from the
@@ -41,7 +41,7 @@ The crate isn't on crates.io yet. Add it from GitHub:
 
 ```toml
 [dependencies]
-open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.6.2" }
+open-stomp = { git = "https://github.com/JackMechem/open-stomp-lib", tag = "v0.6.3" }
 ```
 
 To follow releases instead of pinning one, use `branch = "stable"` (newest release) or `branch = "unstable"`
