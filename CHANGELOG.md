@@ -6,6 +6,10 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Removed
+- PyPI publishing (and the TestPyPI dry run). Python wheels and the sdist are still attached to each
+  GitHub release.
+
 ## [0.6.3] - 2026-11-24
 
 ### Added
