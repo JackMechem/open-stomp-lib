@@ -239,6 +239,12 @@ impl Device {
         self.send(host::looper_button(button));
     }
 
+    /// Switch the tuner on or off. The pedal answers with its tuner notification, so the state is
+    /// read back.
+    pub fn set_tuner(&self, on: bool) {
+        self.write(vec![host::tuner(on)]);
+    }
+
     /// Store `preset` in slot `preset.index` (with its name) and select it, using the official
     /// app's sequence. `source_slot` is the active preset the edits were made on.
     pub fn save_preset(&self, source_slot: u8, preset: &Preset) {

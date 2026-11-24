@@ -56,7 +56,7 @@ reverse-engineering workbench (sniffer, decoders, static-analysis artefacts) als
       included (`examples/ble_check.rs`)
 - [x] Release channels: `stable` / `unstable` branches moved by `channels.yml`; pre-releases are `vX.Y.Z-beta.N`
 - [ ] Open questions that matter for v1 ([docs/09](docs/09-open-questions.md) #1–#3): preset unknown bytes (#1),
-      host CCs `0x4A` and tuner control (#2; `0x40`/`0x42`/`0x43` confirmed), edit-buffer write (#3)
+      host CC `0x4A` (#2; `0x40`/`0x42`/`0x43` and tuner control confirmed), edit-buffer write (#3)
 - [x] Run preset *writes* on hardware (2026-11-19, through the manager's preset import; docs/09 #4)
 - [ ] Run settings *writes* on hardware (byte-exact vs the capture, not yet run from this code)
 - [ ] LSTM / ConvNet NAM models

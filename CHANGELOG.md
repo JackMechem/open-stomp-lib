@@ -6,6 +6,11 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Added
+- Switch the tuner on and off from the host: `host::tuner(on)` / `Device::set_tuner(on)` (Python:
+  `midi.host.tuner`, `Device.set_tuner`). Confirmed on a pedal (v1.1.1, USB): the pedal acks, enters or
+  leaves tuner mode and sends its tuner notification.
+
 ### Fixed
 - The tuner showed every note three semitones sharp (G read as A#). The pedal numbers pitch classes
   from A, not C; `Tuner::note` is now a correct index into `catalog::NOTES`.

@@ -338,6 +338,11 @@ impl Device {
         self.with(|d| d.looper_button(button))
     }
 
+    /// Switch the tuner on or off.
+    fn set_tuner(&self, on: bool) -> PyResult<()> {
+        self.with(|d| d.set_tuner(on))
+    }
+
     /// Store `preset` in slot `preset.index` with its name and select it (the official app's
     /// sequence). `source_slot` is the active preset the edits were made on.
     fn save_preset(&self, source_slot: u8, preset: PyRef<'_, Preset>) -> PyResult<()> {
