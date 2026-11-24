@@ -6,6 +6,10 @@ All notable changes to `open-stomp`. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- The tuner showed every note three semitones sharp (G read as A#). The pedal numbers pitch classes
+  from A, not C; `Tuner::note` is now a correct index into `catalog::NOTES`.
+
 ## [0.6.2] - 2026-11-19
 
 ### Added

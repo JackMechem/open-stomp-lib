@@ -363,7 +363,8 @@ impl DeviceState {
             0x45 | 0x46 | 0x48 => {
                 match cc {
                     0x45 => self.tuner.detected = val != 0,
-                    0x46 => self.tuner.note = Some(val % 12),
+                    // The pedal counts pitch classes from A (A=0); NOTES starts at C.
+                    0x46 => self.tuner.note = Some((val + 9) % 12),
                     _ => self.tuner.cents = Some(val),
                 }
                 ev.category = Category::Tuner;
@@ -626,6 +627,24 @@ impl DeviceState {
                     ev.value = hex(shown) + if payload.len() > 16 { " …" } else { "" };
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tuner_pitch_class_counts_from_a() {
+        let mut st = DeviceState::default();
+        st.apply(&[0xB0, 0x45, 1], Origin::Pedal);
+        st.apply(&[0xB0, 0x48, 50], Origin::Pedal);
+        // Raw values the pedal sent for a bass's open strings.
+        for (raw, note) in [(7, "E"), (0, "A"), (5, "D"), (10, "G")] {
+            let ev = st.apply(&[0xB0, 0x46, raw], Origin::Pedal);
+            assert_eq!(st.tuner.note.map(|n| NOTES[n as usize]), Some(note));
+            assert_eq!(ev.value, format!("{note} +0 ¢"));
         }
     }
 }
